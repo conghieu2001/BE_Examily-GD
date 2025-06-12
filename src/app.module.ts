@@ -1,8 +1,15 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+// import { AppController } from './app.controller';
+// import { AppService } from './app.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { UsersModule } from './users/users.module';
+import { RolesModule } from './roles/roles.module';
+import { APP_GUARD } from '@nestjs/core';
+import { AuthGuard } from './auth/auth.guard';
+import { AuthModule } from './auth/auth.module';
+import { GroupsModule } from './groups/groups.module';
+import { GroupmembersModule } from './groupmembers/groupmembers.module';
 
 @Module({
   imports: [
@@ -24,8 +31,18 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       }),
       inject: [ConfigService],
     }),
+    AuthModule,
+    UsersModule,
+    RolesModule,
+    GroupsModule,
+    GroupmembersModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [],
+  providers: [
+    {
+      provide: APP_GUARD, // Đăng ký AuthGuard cho tất cả các route
+      useClass: AuthGuard,
+    },
+  ],
 })
 export class AppModule { }

@@ -11,22 +11,27 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   //middlewares
-  app.useGlobalFilters(new HttpExceptionFilter());
-  // log time request
-  app.useGlobalInterceptors(new LoggingInterceptor());
-  // customize response
-  app.useGlobalInterceptors(new TransformInterceptor());
-  // handle errors
-  app.useGlobalInterceptors(new ErrorsInterceptor);
-  // handle timeout
-  app.useGlobalInterceptors(new TimeoutInterceptor);
-  
+  // app.useGlobalFilters(new HttpExceptionFilter());
+  // // log time request
+  // app.useGlobalInterceptors(new LoggingInterceptor());
+  // // customize response
+  // app.useGlobalInterceptors(new TransformInterceptor());
+  // // handle errors
+  // app.useGlobalInterceptors(new ErrorsInterceptor());
+  // // handle timeout
+  // app.useGlobalInterceptors(new TimeoutInterceptor);
+  // set global route
+  app.setGlobalPrefix('api');
   // Global ValidationPipe để tự động validate DTO
+  //validation
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, // Tự động loại bỏ các thuộc tính thừa
-      forbidNonWhitelisted: true, // Báo lỗi nếu gửi các thuộc tính không hợp lệ
-      transform: true, // Tự động convert kiểu dữ liệu
+      transform: true,
+      whitelist: true,
+      disableErrorMessages: false,
+      // transformOptions: {
+      //   enableImplicitConversion: true,
+      // },
     }),
   );
 
@@ -39,11 +44,10 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-
-  const port:number  = parseInt(process.env.PORT?.toString() || '30023');
+  const port: number = parseInt(process.env.PORT?.toString() || '30023');
   await app.listen(port);
   // log starting message
-  console.log(`Nest application is starting: http://localhost:${port}`);
+  console.log(`Nest application is starting: http://localhost:${port}/api/`);
   console.log(`Database connected : ${process.env.DB_DATABASE}`);
 }
 bootstrap();
