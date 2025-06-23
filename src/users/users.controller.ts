@@ -20,7 +20,7 @@ export class UsersController {
     const userDto: CreateUserDto = {
       fullName: `Quản Trị Viên`,
       username: 'admin',
-      email: 'admin1@gmail.com',
+      email: 'admin@gmail.com',
       role: 'Quản trị viên',
       password: '11111111',
       isAdmin: true,

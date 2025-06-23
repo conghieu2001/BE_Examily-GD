@@ -8,8 +8,11 @@ import { RolesModule } from './roles/roles.module';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from './auth/auth.guard';
 import { AuthModule } from './auth/auth.module';
-import { GroupsModule } from './groups/groups.module';
-import { GroupmembersModule } from './groupmembers/groupmembers.module';
+import { RoleInGroupModule } from './role_in_group/role_in_group.module';
+import { ExamsModule } from './exams/exams.module';
+import { QuestionsModule } from './questions/questions.module';
+import { CoursesModule } from './courses/courses.module';
+import { CoursemembersModule } from './coursemembers/coursemembers.module';
 
 @Module({
   imports: [
@@ -34,8 +37,11 @@ import { GroupmembersModule } from './groupmembers/groupmembers.module';
     AuthModule,
     UsersModule,
     RolesModule,
-    GroupsModule,
-    GroupmembersModule,
+    RoleInGroupModule,
+    ExamsModule,
+    QuestionsModule,
+    CoursesModule,
+    CoursemembersModule,
   ],
   controllers: [],
   providers: [
