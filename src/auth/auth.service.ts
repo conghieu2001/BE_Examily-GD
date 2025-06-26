@@ -16,7 +16,7 @@ export class AuthService {
   ) { }
   async logIn(data: LoginDto): Promise<any> {
     const user = await this.repoUser?.findOne({
-      where: { email: data.email },
+      where: { username: data.username },
     })
     if (!user) {
       throw new NotFoundException(`Tài khoản hoặc mật khẩu không đúng`)

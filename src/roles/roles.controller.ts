@@ -2,6 +2,9 @@ import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/commo
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { Public } from 'src/auth/auth.decorator';
+import { Role } from './role.enum';
+import { ItemDto } from 'src/common/paginations/dtos/page.dto';
 
 @Controller('roles')
 export class RolesController {
@@ -13,8 +16,10 @@ export class RolesController {
   }
 
   @Get()
+    @Public()
   findAll() {
-    return this.rolesService.findAll();
+    const roles :any = Object.values(Role);
+    return new ItemDto(roles);
   }
 
   @Get(':id')
