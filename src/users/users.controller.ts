@@ -16,15 +16,13 @@ export class UsersController {
   @Post('admin')
   @Public()
   async createAdmin() {
-
     const userDto: CreateUserDto = {
       fullName: `Quản Trị Viên`,
       username: 'admin',
-      email: 'admin@gmail.com',
       role: 'Quản trị viên',
       password: '11111111',
       isAdmin: true,
-      images: 'public/user/image/default-avatar.png'
+      avatar: '/public/default/default-user.jpg'
     };
     return await this.usersService.create(userDto);
   }
@@ -37,12 +35,10 @@ export class UsersController {
     ...multerOptions,
   }))
   async create(
-    @UploadedFile() images: Express.Multer.File,
     @Body() createUserDto: CreateUserDto,
   ) {
-    console.log(images)
-    const filePath = images ? `public/user/image/${images.filename}` : 'public/user/image/default-avatar.png';
-    return await this.usersService.create({ ...createUserDto, images: filePath });
+
+    return await this.usersService.create({ ...createUserDto });
   }
 
   @Post('change-password')
@@ -71,27 +67,16 @@ export class UsersController {
     storage: storage('user', true),
     ...multerOptions,
   }))
-  async update(
-    @Param('id') id: string,
-    @UploadedFile() images: Express.Multer.File,
-    @Body() updateUserDto: UpdateUserDto
-  ) {
-    // Lấy user hiện tại từ DB
-    const existingUser = await this.usersService.findOne(+id);
-    if (!existingUser) {
-      throw new NotFoundException('User not found');
-    }
-
-    // Nếu có file thì cập nhật đường dẫn ảnh mới
-    if (images) {
-      updateUserDto.images = `public/user/image/${images.filename}`;
-    } else {
-      // Không có file => giữ ảnh cũ
-      updateUserDto.images = existingUser.images;
-    }
-
-    return this.usersService.update(+id, updateUserDto);
-  }
+  // update(
+  //   @Param('id') id: string,
+  //   @Body() updateUserDto: UpdateUserDto,
+  //   @UploadedFile() images: Express.Multer.File,
+  // ) {
+  //   if (!images) {
+  //     throw new NotFoundException('Không tìm thấy ảnh đại diện');
+  //   }
+  //   return this.usersService.update(+id, { ...updateUserDto, images });
+  // }
 
   @Delete(':id')
   remove(@Param('id') id: string) {

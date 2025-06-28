@@ -17,33 +17,16 @@ export class UsersService {
     @InjectRepository(User) private userRepo: Repository<User>
   ) { }
   async create(createUserDto: CreateUserDto) {
-    const { fullName, username, password, email, role = 'Học sinh', isAdmin, images } = createUserDto;
-    if (!fullName || !username || !password || !email) {
-      throw new BadRequestException('Điền đầy đủ thông tin.');
-    }
-    // Kiểm tra định dạng email
-    if (!email || !isEmail(email)) {
-      throw new BadRequestException('Email không hợp lệ!');
-    }
-
-    // Kiểm tra độ dài password
-    if (!password || password.length < 8) {
-      throw new BadRequestException('Mật khẩu phải có ít nhất 8 ký tự!');
-    }
-
-    const existUser = await this.userRepo.findOne({ where: { email } });
-    if (existUser) {
-      throw new BadRequestException('Email đã tồn tại!');
-    }
+    const { fullName, username, password, role = 'Học sinh', isAdmin } = createUserDto;
+   
+   
     const user = await this.userRepo.save({
       fullName,
-      email,
       username,
       password: UserUtil.hashPassword(password),
       role,
-      images: images,
       isAdmin: isAdmin ?? false,
-      // createBy: user
+      avatar: '/public/default/default-user.jpg', 
     });
     // console.log(user)
     return user;
@@ -122,36 +105,7 @@ export class UsersService {
     return user;
   }
 
-  async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
-    const user = await this.userRepo.findOne({ where: { id } });
   
-    if (!user) {
-      throw new NotFoundException(`Không tìm thấy người dùng với ID: ${id}`);
-    }
-    // Không cho phép cập nhật mật khẩu tại đây
-    if ('password' in updateUserDto) {
-      delete updateUserDto.password;
-    }
-    // Kiểm tra email mới (nếu có) không trùng với người dùng khác
-    if (updateUserDto.email) {
-      const checking = await this.userRepo.findOne({ where: { email: updateUserDto.email } });
-  
-      if (checking && checking.id !== id) {
-        throw new BadRequestException('Email đã được sử dụng bởi người dùng khác!');
-      }
-    }
-  
-    // Nếu không có trường nào trong DTO được cập nhật, bỏ qua update
-    if (Object.keys(updateUserDto).length === 0) {
-      return user;
-    }
-    // Thực hiện cập nhật
-    await this.userRepo.update(id, updateUserDto);
-  
-    // Trả về bản ghi mới sau cập nhật
-    const updatedUser = await this.userRepo.findOne({ where: { id } });
-    return updatedUser!;
-  }
 
   async remove(id: number): Promise<User> {
     const user = await this.userRepo.findOne({ where: { id } })
