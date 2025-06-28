@@ -12,12 +12,9 @@ import { RoleInGroupModule } from './role_in_group/role_in_group.module';
 import { ExamsModule } from './exams/exams.module';
 import { QuestionsModule } from './questions/questions.module';
 import { CoursesModule } from './courses/courses.module';
-import { CoursemembersModule } from './coursemembers/coursemembers.module';
-import { ClassesModule } from './classes/classes.module';
-import { SubjectsModule } from './subjects/subjects.module';
-import { TopicsModule } from './topics/topics.module';
-import { LevelsModule } from './levels/levels.module';
-import { MultipeChoiceModule } from './multipe-choice/multipe-choice.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+// import { CoursemembersModule } from './coursemembers/coursemembers.module';
 
 @Module({
   imports: [
@@ -26,7 +23,10 @@ import { MultipeChoiceModule } from './multipe-choice/multipe-choice.module';
       envFilePath: process.env.NODE_ENV ? `.env.${process.env.NODE_ENV}`  : '.env.development',
     }),
     TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
+      imports: [ConfigModule, ServeStaticModule.forRoot({
+        rootPath: join(__dirname, '..', 'public'),
+        serveRoot: '/public', // URL gốc, ví dụ: http://localhost:3000/index.html
+      }),],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
         host: configService.get<string>('DB_HOST'),
@@ -46,12 +46,6 @@ import { MultipeChoiceModule } from './multipe-choice/multipe-choice.module';
     ExamsModule,
     QuestionsModule,
     CoursesModule,
-    CoursemembersModule,
-    ClassesModule,
-    SubjectsModule,
-    TopicsModule,
-    LevelsModule,
-    MultipeChoiceModule,
   ],
   controllers: [],
   providers: [

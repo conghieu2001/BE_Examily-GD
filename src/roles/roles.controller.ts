@@ -18,8 +18,7 @@ export class RolesController {
   @Get()
     @Public()
   findAll() {
-    const roles :any = Object.values(Role);
-    return new ItemDto(roles);
+    return this.rolesService.findAll();
   }
 
   @Get(':id')

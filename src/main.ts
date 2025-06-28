@@ -11,15 +11,15 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   //middlewares
-  // app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalFilters(new HttpExceptionFilter());
   // // log time request
-  // app.useGlobalInterceptors(new LoggingInterceptor());
+  app.useGlobalInterceptors(new LoggingInterceptor());
   // // customize response
-  // app.useGlobalInterceptors(new TransformInterceptor());
+  app.useGlobalInterceptors(new TransformInterceptor());
   // // handle errors
-  // app.useGlobalInterceptors(new ErrorsInterceptor());
+  app.useGlobalInterceptors(new ErrorsInterceptor());
   // // handle timeout
-  // app.useGlobalInterceptors(new TimeoutInterceptor);
+  app.useGlobalInterceptors(new TimeoutInterceptor);
   // set global route
   app.setGlobalPrefix('api');
   // Global ValidationPipe để tự động validate DTO
@@ -29,11 +29,17 @@ async function bootstrap() {
       transform: true,
       whitelist: true,
       disableErrorMessages: false,
-      // transformOptions: {
-      //   enableImplicitConversion: true,
-      // },
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
     }),
   );
+  // CORS setup
+  app.enableCors({
+    origin: process.env.CORS_ORIGIN || '*', // Cho phép tất cả hoặc chỉ định origin cụ thể
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true, // Cho phép cookie và thông tin xác thực khác
+  });
 
   // Swagger setup
   const config = new DocumentBuilder()
