@@ -45,7 +45,7 @@ export class CousemembersService {
     const queryBuilder = this.coursememberRepo
       .createQueryBuilder('coursemember')
       .leftJoinAndSelect('coursemember.user', 'user')
-      .leftJoinAndSelect('coursemember.group', 'group');
+      .leftJoinAndSelect('coursemember.group', 'course');
 
     const { skip, take, order = 'ASC', search } = pageOptions;
     const paginationKeys = ['page', 'take', 'skip', 'order', 'search'];
@@ -91,7 +91,7 @@ export class CousemembersService {
   async remove(id: number): Promise<ItemDto<CourseMember>> {
     const coursemember = await this.coursememberRepo.findOne({
       where: { id },
-      relations: ['user', 'group'],
+      relations: ['user', 'course'],
     });
 
     if (!coursemember) {
@@ -99,6 +99,6 @@ export class CousemembersService {
     }
 
     await this.coursememberRepo.softRemove(coursemember);
-    return new ItemDto(coursemember); // hoặc return thông báo đơn giản nếu không cần trả dữ liệu
+    return new ItemDto(coursemember);
   }
 }

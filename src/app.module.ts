@@ -13,6 +13,11 @@ import { ExamsModule } from './exams/exams.module';
 import { QuestionsModule } from './questions/questions.module';
 import { CoursesModule } from './courses/courses.module';
 import { CoursemembersModule } from './coursemembers/coursemembers.module';
+import { ClassesModule } from './classes/classes.module';
+import { SubjectsModule } from './subjects/subjects.module';
+import { TopicsModule } from './topics/topics.module';
+import { LevelsModule } from './levels/levels.module';
+import { MultipeChoiceModule } from './multipe-choice/multipe-choice.module';
 
 @Module({
   imports: [
@@ -42,6 +47,11 @@ import { CoursemembersModule } from './coursemembers/coursemembers.module';
     QuestionsModule,
     CoursesModule,
     CoursemembersModule,
+    ClassesModule,
+    SubjectsModule,
+    TopicsModule,
+    LevelsModule,
+    MultipeChoiceModule,
   ],
   controllers: [],
   providers: [
