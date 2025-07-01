@@ -1,5 +1,6 @@
 import { Class } from "src/classes/entities/class.entity";
 import { BaseWithCreatedBy } from "src/common/entities/base-user-createdBy";
+import { Question } from "src/questions/entities/question.entity";
 import { Topic } from "src/topics/entities/topic.entity";
 import { Column, Entity, JoinColumn, ManyToMany, ManyToOne, OneToMany, OneToOne } from "typeorm";
 
@@ -14,4 +15,7 @@ export class Subject extends BaseWithCreatedBy {
 
     @OneToMany(() => Topic, topic => topic.subject, { cascade: true })
     topics: Topic[];
+
+    @OneToMany(() => Question, question => question.subject)
+    questions: Question[];
 }
