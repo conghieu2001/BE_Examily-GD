@@ -82,7 +82,7 @@ export class UsersService {
     // Tìm kiếm theo tên hoặc email (tuỳ chỉnh)
     if (search) {
       queryBuilder.andWhere(
-        `LOWER(unaccent(user.fullname)) ILIKE LOWER(unaccent(:search)) OR LOWER(unaccent(user.username)) ILIKE LOWER(unaccent(:search))`,
+        `LOWER(unaccent(user.fullName)) ILIKE LOWER(unaccent(:search)) OR LOWER(unaccent(user.username)) ILIKE LOWER(unaccent(:search))`,
         { search: `%${search}%` }
       );
     }

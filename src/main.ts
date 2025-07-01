@@ -7,6 +7,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ErrorsInterceptor } from './common/interceptors/errors.interceptor';
 import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -41,6 +42,8 @@ async function bootstrap() {
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true, // Cho phép cookie và thông tin xác thực khác
   });
+  // Serve config service
+  const configService = app.get(ConfigService);
 
   // Swagger setup
   const config = new DocumentBuilder()
@@ -51,7 +54,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  const port: number = parseInt(process.env.PORT?.toString() || '30023');
+  const port:number = configService.get<number>('PORT') || 3000;
   await app.listen(port);
   // log starting message
   console.log(`Nest application is starting: http://localhost:${port}/api/`);
