@@ -18,7 +18,7 @@ export class UsersService {
     @InjectRepository(User) private userRepo: Repository<User>
   ) { }
   async create(createUserDto: CreateUserDto, user: User) {
-    const { fullName, username, password, role ='Học sinh' , isAdmin } = createUserDto;
+    const { fullName, username, password, role = Role.STUDENT , isAdmin } = createUserDto;
    
     const exitsUser: User|null = await this.userRepo.findOne({ where: { username: username } });
     
@@ -29,7 +29,7 @@ export class UsersService {
       fullName,
       username,
       password: UserUtil.hashPassword(password.toString()),
-      role: user.role === Role.ADMIN ? role : 'Học Sinh', // Chỉ admin mới có thể tạo user với role khác
+      role: user.role === Role.ADMIN ? role : Role.STUDENT, // Chỉ admin mới có thể tạo user với role khác
       isAdmin: isAdmin ?? false,
       avatar: '/public/default/default-user.jpg', 
       createdBy: user, // Lưu ID của người tạo

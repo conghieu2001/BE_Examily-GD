@@ -71,7 +71,7 @@ export class UsersController {
           fullName: item['Họ và tên'] || item['Full Name'],
           username: item['Tên đăng nhập'] || item['Username'],
           password: item['Mật khẩu'] || item['Password'],
-          role: 'Học Sinh',
+          role: Role.STUDENT,
           isAdmin: false,
           avatar: item['Ảnh đại diện'] || item['Avatar'] || '/public/default/default-user.jpg',
         };
