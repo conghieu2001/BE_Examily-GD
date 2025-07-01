@@ -31,7 +31,7 @@ export class AuthGuard implements CanActivate {
         // console.log(payload)
         request['user'] = payload;
       } catch (e) {
-        // console.log(e)
+        console.log(e)
         if (e instanceof TokenExpiredError) {
           throw new UnauthorizedException('Token hết hạn');
         }
@@ -42,6 +42,7 @@ export class AuthGuard implements CanActivate {
   
     private extractTokenFromHeader(request: Request): string | undefined {
       const [type, token] = request.headers.authorization?.split(' ') ?? [];
+      console.log(token);
       return type === 'Bearer' ? token : undefined;
     }
 }

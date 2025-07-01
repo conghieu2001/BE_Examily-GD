@@ -8,5 +8,4 @@ export class BaseDto {
    @IsOptional()
     isPublic?: any = false;
     
-  
 }

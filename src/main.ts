@@ -1,4 +1,4 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -15,9 +15,10 @@ async function bootstrap() {
   // // log time request
   app.useGlobalInterceptors(new LoggingInterceptor());
   // // customize response
-  app.useGlobalInterceptors(new TransformInterceptor());
+  const reflector = app.get(Reflector);
+  app.useGlobalInterceptors(new TransformInterceptor(reflector));
   // // handle errors
-  app.useGlobalInterceptors(new ErrorsInterceptor());
+  // app.useGlobalInterceptors(new ErrorsInterceptor());
   // // handle timeout
   app.useGlobalInterceptors(new TimeoutInterceptor);
   // set global route

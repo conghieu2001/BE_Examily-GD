@@ -8,28 +8,33 @@ import { isEmail } from 'class-validator';
 import { UserUtil } from 'src/common/bryct/config.bryct';
 import { ChangePassDto } from './dto/change-pass-dto';
 import { PageOptionsDto } from 'src/common/paginations/dtos/page-option-dto';
-import { PageDto } from 'src/common/paginations/dtos/page.dto';
+import { ItemDto, PageDto } from 'src/common/paginations/dtos/page.dto';
 import { PageMetaDto } from 'src/common/paginations/dtos/page.metadata.dto';
+import { Role } from 'src/roles/role.enum';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>
   ) { }
-  async create(createUserDto: CreateUserDto) {
-    const { fullName, username, password, role = 'Học sinh', isAdmin } = createUserDto;
+  async create(createUserDto: CreateUserDto, user: User) {
+    const { fullName, username, password, role ='Học sinh' , isAdmin } = createUserDto;
    
-   
-    const user = await this.userRepo.save({
+    const exitsUser: User|null = await this.userRepo.findOne({ where: { username: username } });
+    
+    if (exitsUser) {
+      throw new BadRequestException('Username đã được sử dụng')
+    }
+    const userCreate = await this.userRepo.save({
       fullName,
       username,
-      password: UserUtil.hashPassword(password),
-      role,
+      password: UserUtil.hashPassword(password.toString()),
+      role: user.role === Role.ADMIN ? role : 'Học Sinh', // Chỉ admin mới có thể tạo user với role khác
       isAdmin: isAdmin ?? false,
       avatar: '/public/default/default-user.jpg', 
+      createdBy: user, // Lưu ID của người tạo
     });
-    // console.log(user)
-    return user;
+    return userCreate;
   }
   async changePassword(dto: ChangePassDto, user: User): Promise<User> {
     const { password, newPassword } = dto;
@@ -62,12 +67,13 @@ export class UsersService {
     const queryBuilder = this.userRepo.createQueryBuilder('user')
   
     const { page, take, skip, order, search } = pageOptions;
-    const pagination: string[] = ['page', 'take', 'skip', 'order', 'search'];
+    const pagination: string[] = ['page', 'take', 'skip', 'order', 'search','limit', 'offset', 'sort', 'orderBy'];
   
     // Lọc theo các trường khác
     if (query && Object.keys(query).length > 0) {
       for (const key of Object.keys(query)) {
         if (!pagination.includes(key)) {
+          console.log(key);
           queryBuilder.andWhere(`user.${key} = :${key}`, { [key]: query[key] });
         }
       }
@@ -76,7 +82,7 @@ export class UsersService {
     // Tìm kiếm theo tên hoặc email (tuỳ chỉnh)
     if (search) {
       queryBuilder.andWhere(
-        `LOWER(unaccent(user.username)) ILIKE LOWER(unaccent(:search)) OR LOWER(unaccent(user.email)) ILIKE LOWER(unaccent(:search))`,
+        `LOWER(unaccent(user.fullname)) ILIKE LOWER(unaccent(:search)) OR LOWER(unaccent(user.username)) ILIKE LOWER(unaccent(:search))`,
         { search: `%${search}%` }
       );
     }
@@ -93,7 +99,7 @@ export class UsersService {
     return new PageDto(items, pageMetaDto);
   }
 
-  async findOne(id: number): Promise<User> {
+  async findOne(id: number): Promise<ItemDto<User>> {
     const user = await this.userRepo.findOne({
       where: { id },
     });
@@ -102,7 +108,7 @@ export class UsersService {
       throw new NotFoundException(`Không tìm thấy người dùng với ID: ${id}`);
     }
   
-    return user;
+    return new ItemDto(user);
   }
 
   
