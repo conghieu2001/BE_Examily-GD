@@ -12,6 +12,7 @@ export class QuestionsController {
   constructor(private readonly questionsService: QuestionsService) {}
 
   @Post()
+  @Public()
   create(@Body() createQuestionDto: CreateQuestionDto, @Req() request: Request) {
       const user: User = request['user'] ?? null; 
     return this.questionsService.create(createQuestionDto, user);

@@ -17,6 +17,7 @@ export class AnswersService {
     @InjectRepository(Question) private questionRepo: Repository<Question>,
   ) { }
   async create(createAnswerDto: CreateAnswerDto, user: User): Promise<Answer> {
+    // console.log('question')
     const { content, questionId, isCorrect } = createAnswerDto;
     const question = await this.questionRepo.findOne({
       where: { id: questionId },
@@ -28,7 +29,7 @@ export class AnswersService {
       createdBy: user,
     } as DeepPartial<Question>);
 
-    return await this.questionRepo.save(newAnswer);
+    return await this.answerRepo.save(newAnswer);
   }
 
   async findAll(

@@ -18,6 +18,10 @@ import { CoursesModule } from './courses/courses.module';
 import { SubjectsModule } from './subjects/subjects.module';   // ✅ Thêm
 import { TopicsModule } from './topics/topics.module';         // ✅ Thêm
 import { AnswersModule } from './answers/answers.module';
+import { ClassesModule } from './classes/classes.module';
+import { LevelsModule } from './levels/levels.module';
+import { MultipeChoiceModule } from './multipe-choice/multipe-choice.module';
+import { TypeQuestionsModule } from './type-questions/type-questions.module';
 
 @Module({
   imports: [
@@ -54,9 +58,12 @@ import { AnswersModule } from './answers/answers.module';
     ExamsModule,
     QuestionsModule,
     CoursesModule,
-
-    SubjectsModule, // ✅ Quan trọng
-    TopicsModule, AnswersModule,   // ✅ Quan trọng
+    ClassesModule,
+    LevelsModule,
+    MultipeChoiceModule,
+    SubjectsModule,
+    TopicsModule, 
+    AnswersModule, TypeQuestionsModule,
   ],
   controllers: [],
   providers: [
