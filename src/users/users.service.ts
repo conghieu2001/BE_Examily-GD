@@ -11,6 +11,7 @@ import { PageOptionsDto } from 'src/common/paginations/dtos/page-option-dto';
 import { ItemDto, PageDto } from 'src/common/paginations/dtos/page.dto';
 import { PageMetaDto } from 'src/common/paginations/dtos/page.metadata.dto';
 import { Role } from 'src/roles/role.enum';
+import { paginationKeyword } from 'src/utils/keywork-pagination';
 
 @Injectable()
 export class UsersService {
@@ -36,6 +37,8 @@ export class UsersService {
     });
     return userCreate;
   }
+
+
   async changePassword(dto: ChangePassDto, user: User): Promise<User> {
     const { password, newPassword } = dto;
 
@@ -63,17 +66,24 @@ export class UsersService {
 
     return newUser;
   }
-  async findAll(pageOptions: PageOptionsDto, query: Partial<User>): Promise<PageDto<User>> {
-    const queryBuilder = this.userRepo.createQueryBuilder('user')
-  
+
+
+  async findAll(pageOptions: PageOptionsDto, query: Partial<User>, user): Promise<PageDto<User>> {
+    const queryBuilder = this.userRepo.createQueryBuilder('user').leftJoin('user.createdBy', 'createdBy') // 👈 không dùng leftJoinAndSelect
+      .addSelect([
+        'createdBy.fullName',
+    ])
+      
     const { page, take, skip, order, search } = pageOptions;
-    const pagination: string[] = ['page', 'take', 'skip', 'order', 'search','limit', 'offset', 'sort', 'orderBy'];
-  
+    const pagination: string[] = paginationKeyword;
+    if (user.role == Role.TEACHER) {
+      queryBuilder.andWhere('user.role = :role', { role: Role.STUDENT }); // Chỉ lấy người dùng không phải admin
+    }
     // Lọc theo các trường khác
     if (query && Object.keys(query).length > 0) {
       for (const key of Object.keys(query)) {
         if (!pagination.includes(key)) {
-          console.log(key);
+        
           queryBuilder.andWhere(`user.${key} = :${key}`, { [key]: query[key] });
         }
       }
@@ -113,13 +123,90 @@ export class UsersService {
 
   
 
-  async remove(id: number): Promise<User> {
-    const user = await this.userRepo.findOne({ where: { id } })
+  async blockUser(id: number, currentUser: User): Promise<User> {
+    const targetUser = await this.userRepo.findOne({ where: { id }, relations: ['createdBy'] });
+
+    if (!targetUser) {
+      throw new NotFoundException(`Không tìm thấy người dùng với ID: ${id}`);
+    }
+
+    const isTargetAdmin = targetUser.role === Role.ADMIN;
+    const isTargetTeacher = targetUser.role === Role.TEACHER;
+    const isCurrentAdmin = currentUser.role === Role.ADMIN;
+
+    if (isTargetAdmin) {
+      throw new BadRequestException(`Bạn không có quyền chặn người dùng này`);
+    }
+
+    if (isTargetTeacher && !isCurrentAdmin) {
+      throw new BadRequestException(`Bạn không có quyền chặn người dùng này`);
+    }
+
+    targetUser.isActive = false;
+    await this.userRepo.save(targetUser);
+
+    return targetUser;
+  }
+
+
+  async unblockUser(id: number, currentUser: User): Promise<User> {
+    const targetUser = await this.userRepo.findOne({ where: { id }, relations: ['createdBy'] });
+
+    if (!targetUser) {
+      throw new NotFoundException(`Không tìm thấy người dùng với ID: ${id}`);
+    }
+
+    const isTargetAdmin = targetUser.role === Role.ADMIN;
+    const isTargetTeacher = targetUser.role === Role.TEACHER;
+    const isCurrentAdmin = currentUser.role === Role.ADMIN;
+
+    if (isTargetAdmin) {
+      throw new BadRequestException(`Bạn không có quyền mở chặn người dùng này`);
+    }
+
+    if (isTargetTeacher && !isCurrentAdmin) {
+      throw new BadRequestException(`Bạn không có quyền mở chặn người dùng này`);
+    }
+
+    targetUser.isActive = true;
+    await this.userRepo.save(targetUser);
+
+    return targetUser;
+  }
+  
+
+  async resetPassword(id: number, user:User): Promise<User> {
+    const targetUser = await this.userRepo.findOne({ where: { id }, relations: ['createdBy'] });
+
+    if (!targetUser) {
+      throw new NotFoundException(`Không tìm thấy người dùng với ID: ${id}`);
+    }
+
+    const newPassword = '1';
+    const hashedPassword = UserUtil.hashPassword(newPassword); // mã hóa với salt = 10
+
+    targetUser.password = hashedPassword;
+
+    await this.userRepo.save(targetUser);
+
+    return targetUser;
+  }
+
+  async updateUser(id: number, data: UpdateUserDto): Promise<User> {
+    const user = await this.userRepo.findOne({ where: { id } });
 
     if (!user) {
-      throw new NotFoundException(`Không tìm thấy người dùng với ID: ${id}`)
+      throw new NotFoundException(`Không tìm thấy người dùng với ID: ${id}`);
     }
-    await this.userRepo.softDelete(id);
-    return user
+
+    user.fullName = data.fullName ?? user.fullName;
+    user.username = data.username ?? user.username;
+
+    await this.userRepo.save(user);
+
+    return user;
   }
+  
+
+  
 }

@@ -41,8 +41,8 @@ export class UsersController {
     const user: User = request['user'] ?? null;
     return await this.usersService.create({ ...createUserDto }, user);
   }
- 
-  @Roles( Role.TEACHER) // Chỉ cho phép người dùng có vai trò admin hoặc user truy cập
+
+  @Roles(Role.TEACHER) // Chỉ cho phép người dùng có vai trò admin hoặc user truy cập
   @Post('import-excel')
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data') // <- rất quan trọng để Swagger hiểu
@@ -58,7 +58,7 @@ export class UsersController {
     // Lấy sheet đầu tiên
     const firstSheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[firstSheetName];
-    const data:any = XLSX.utils.sheet_to_json(sheet);
+    const data: any = XLSX.utils.sheet_to_json(sheet);
     if (!data || data.length === 0) {
       throw new NotFoundException('Không tìm thấy dữ liệu trong file Excel');
     }
@@ -87,7 +87,7 @@ export class UsersController {
         })
       }
     }
-    return {results, errors};
+    return { results, errors };
   }
 
   @Post('change-password')
@@ -101,7 +101,7 @@ export class UsersController {
   @Get() // Route GET /users
   async findAll(@Query() pageOptionsDto: PageOptionsDto, @Query() query: Partial<User>, @Req() request: Request) {
     const user = request['user'] ?? null; // Lấy user đang đăng nhập nếu có
-    return this.usersService.findAll(pageOptionsDto, query);
+    return this.usersService.findAll(pageOptionsDto, query, user);
   }
 
   @Get(':id')
@@ -110,25 +110,34 @@ export class UsersController {
     return this.usersService.findOne(+id);
   }
 
-  @Patch(':id')
-  @Public()
-  @UseInterceptors(FileInterceptor('images', {
-    storage: storage('user', true),
-    ...multerOptions,
-  }))
-  // update(
-  //   @Param('id') id: string,
-  //   @Body() updateUserDto: UpdateUserDto,
-  //   @UploadedFile() images: Express.Multer.File,
-  // ) {
-  //   if (!images) {
-  //     throw new NotFoundException('Không tìm thấy ảnh đại diện');
-  //   }
-  //   return this.usersService.update(+id, { ...updateUserDto, images });
-  // }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(+id);
+
+  @Patch('block/:id')
+  @Roles(Role.TEACHER) // Chỉ cho phép người dùng có vai trò admin hoặc user truy cập
+  blockUser(@Param('id') id: string, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.usersService.blockUser(+id, user);
+  }
+
+  @Patch('un-block/:id')
+  @Roles(Role.TEACHER) // Chỉ cho phép người dùng có vai trò admin hoặc user truy cập
+  unblockUser(@Param('id') id: string, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.usersService.unblockUser(+id, user);
+  }
+
+  @Patch('reset-pass/:id')
+  @Roles(Role.TEACHER) // Chỉ cho phép người dùng có vai trò admin hoặc user truy cập
+  resetPass(@Param('id') id: string, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.usersService.resetPassword(+id, user);
+  }
+
+
+  update(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    return this.usersService.updateUser(+id, updateUserDto);
   }
 }

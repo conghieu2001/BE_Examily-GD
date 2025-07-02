@@ -21,6 +21,9 @@ export class AuthService {
     if (!user) {
       throw new NotFoundException(`Tài khoản hoặc mật khẩu không đúng`)
     }
+    if(!user.isActive) {
+      throw new BadRequestException(`Tài khoản đã bị khóa, vui lòng liên hệ quản trị viên`)
+    }
     const isPass = await bcrypt.compare(data.password, user.password)
     if (!isPass) {
       throw new BadRequestException(`Tài khoản hoặc mật khẩu không đúng`)

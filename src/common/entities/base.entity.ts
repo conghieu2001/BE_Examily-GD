@@ -9,6 +9,9 @@ export abstract class BaseEntity {
     @Column()
     uuid: string;
 
+    @Column({default:true})
+    isActive: boolean = true; // Trạng thái hoạt động, mặc định là true
+
     @CreateDateColumn()
     createdAt: Date;
 

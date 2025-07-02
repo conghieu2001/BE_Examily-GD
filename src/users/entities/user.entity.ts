@@ -23,4 +23,6 @@ export class User extends BaseWithCreatedBy {
     @Column({ nullable: true, type: 'text' })
     refreshToken: string | null;
 
+    
+
 }
