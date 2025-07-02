@@ -1,4 +1,4 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -7,6 +7,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ErrorsInterceptor } from './common/interceptors/errors.interceptor';
 import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -15,9 +16,10 @@ async function bootstrap() {
   // // log time request
   app.useGlobalInterceptors(new LoggingInterceptor());
   // // customize response
-  app.useGlobalInterceptors(new TransformInterceptor());
+  const reflector = app.get(Reflector);
+  app.useGlobalInterceptors(new TransformInterceptor(reflector));
   // // handle errors
-  app.useGlobalInterceptors(new ErrorsInterceptor());
+  // app.useGlobalInterceptors(new ErrorsInterceptor());
   // // handle timeout
   app.useGlobalInterceptors(new TimeoutInterceptor);
   // set global route
@@ -40,6 +42,8 @@ async function bootstrap() {
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true, // Cho phép cookie và thông tin xác thực khác
   });
+  // Serve config service
+  const configService = app.get(ConfigService);
 
   // Swagger setup
   const config = new DocumentBuilder()
@@ -50,7 +54,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  const port: number = parseInt(process.env.PORT?.toString() || '30023');
+  const port:number = configService.get<number>('PORT') || 3000;
   await app.listen(port);
   // log starting message
   console.log(`Nest application is starting: http://localhost:${port}/api/`);

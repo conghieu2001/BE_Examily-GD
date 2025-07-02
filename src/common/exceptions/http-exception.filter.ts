@@ -17,13 +17,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
         } else if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
             message = (exceptionResponse as { message: string }).message;
         }
+        console.log(message);
         response
             .status(status)
             .json({
                 statusCode: status,
                 timestamp: new Date().toISOString(),
                 path: request.url,
-                message: status === 500 ? 'Server Error' : message, // Including the message in the response
+                message: status === 500 ? 'Server Error' : 'thiênnthanh', // Including the message in the response
                 errorDetails: exception.stack || '',
             });
     }

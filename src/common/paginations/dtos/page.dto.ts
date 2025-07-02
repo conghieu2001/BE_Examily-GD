@@ -5,13 +5,13 @@ import { PageMetaDto } from './page.metadata.dto';
 export class PageDto<T> {
     @IsArray()
     @ApiProperty({ isArray: true })
-    readonly data: T[];
+    readonly result: T[];
 
     @ApiProperty({ type: () => PageMetaDto })
     readonly meta: PageMetaDto;
 
     constructor(data: T[], meta: PageMetaDto) {
-        this.data = data;
+        this.result = data;
         this.meta = meta;
     }
 }
@@ -20,10 +20,10 @@ export class PageDto<T> {
 export class ItemDto<T> {
     @IsArray()
     @ApiProperty()
-    readonly data: T;
+    readonly result: T;
 
 
     constructor(data: T) {
-        this.data = data;
+        this.result = data;
     }
 }

@@ -1,5 +1,5 @@
 export enum Role {
     ADMIN = 'Quản trị viên',
-    CUSTOMER = 'Học sinh',
+    STUDENT = 'Học sinh',
     TEACHER = 'Giáo viên',
 }

@@ -1,14 +1,15 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, OmitType } from "@nestjs/swagger";
 import { IsEmail, IsOptional, IsString } from "class-validator";
+import { BaseDto } from "src/common/dto/base.dto";
 
-export class CreateUserDto {
+export class CreateUserDto extends OmitType(BaseDto, [] as const) {
     @ApiProperty()
     @IsString()
     fullName: string;
     @ApiProperty()
     @IsString()
     username: string;
-     
+
     @ApiProperty()
     @IsString()
     password: string;

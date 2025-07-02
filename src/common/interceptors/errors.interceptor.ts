@@ -16,7 +16,7 @@ export class ErrorsInterceptor implements NestInterceptor {
             catchError((err) => {
                 // Nếu đã là HttpException thì trả ra nguyên trạng
                 if (err instanceof HttpException) {
-                    return throwError(() => err);
+                    return throwError(() => err.message);
                 }
 
                 // Nếu không phải HttpException thì trả về lỗi 500 mặc định

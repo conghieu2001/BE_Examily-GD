@@ -39,11 +39,11 @@ import { TypeQuestionsModule } from './type-questions/type-questions.module';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
-        host: configService.get<string>('DB_HOST'),
-        port: configService.get<number>('DB_PORT'),
-        username: configService.get<string>('DB_USERNAME'),
-        password: configService.get<string>('DB_PASSWORD'),
-        database: configService.get<string>('DB_DATABASE'),
+        host: configService.get<string>('DB_HOST') ?? process.env.DB_HOST,
+        port: configService.get<number>('DB_PORT') ?? parseInt(process.env.DB_PORT || '5432', 10),
+        username: configService.get<string>('DB_USERNAME') ?? process.env.DB_USERNAME,
+        password: configService.get<string>('DB_PASSWORD') ?? process.env.DB_PASSWORD,
+        database: configService.get<string>('DB_DATABASE') ?? process.env.DB_DATABASE,
         autoLoadEntities: true,
         synchronize: true, // ❗️Không bật ở môi trường production
       }),
