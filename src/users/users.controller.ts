@@ -90,12 +90,6 @@ export class UsersController {
     return { results, errors };
   }
 
-  @Post('change-password')
-  async changePassword(@Body() dto: ChangePassDto, @Req() request: Request) {
-    const user: User = request['user'] ?? null;
-    const changePass = await this.usersService.changePassword({ ...dto }, user)
-    return changePass;
-  }
 
   @Roles(Role.TEACHER) // Chỉ cho phép người dùng có vai trò admin hoặc user truy cập
   @Get() // Route GET /users
@@ -133,7 +127,15 @@ export class UsersController {
     return this.usersService.resetPassword(+id, user);
   }
 
+  @Patch('change-pass')
+  @Roles(Role.TEACHER) // Chỉ cho phép người dùng có vai trò admin hoặc user truy cập
+  changePass(@Body() changeDto: ChangePassDto, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.usersService.changePassword(user.id,changeDto, user);
+  }
 
+  @Patch(':id')
+  @Roles(Role.TEACHER) // Chỉ cho phép người dùng có vai trò admin hoặc user truy cập
   update(
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,

@@ -39,11 +39,11 @@ export class UsersService {
   }
 
 
-  async changePassword(dto: ChangePassDto, user: User): Promise<User> {
+  async changePassword(id:number,dto: ChangePassDto, user: User): Promise<Partial<User>> {
     const { password, newPassword } = dto;
 
     // 1️⃣ Tìm user theo `userId`
-    const checkUser = await this.userRepo.findOne({ where: { id: user.id } });
+    const checkUser = await this.userRepo.findOne({ where: { id: id } , relations: ['createdBy'] });
     if (!checkUser) {
       throw new NotFoundException('User not found');
     }
@@ -53,10 +53,7 @@ export class UsersService {
     if (!isMatch) {
       throw new BadRequestException('Mật khẩu cũ không chính xác');
     }
-    // Kiểm tra độ dài password
-    if (!newPassword || newPassword.length < 8) {
-      throw new BadRequestException('Mật khẩu phải có ít nhất 8 ký tự!');
-    }
+   
     // 3️⃣ Mã hóa mật khẩu mới
     const hashedPassword = await UserUtil.hashPassword(newPassword);
 
@@ -64,7 +61,10 @@ export class UsersService {
     user.password = hashedPassword;
     const newUser = await this.userRepo.save(user);
 
-    return newUser;
+    return {
+      ...newUser,
+      password: undefined, 
+    };
   }
 
 
@@ -108,6 +108,7 @@ export class UsersService {
   
     return new PageDto(items, pageMetaDto);
   }
+  
 
   async findOne(id: number): Promise<ItemDto<User>> {
     const user = await this.userRepo.findOne({
