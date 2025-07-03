@@ -7,6 +7,7 @@ import { ItemDto, PageDto } from 'src/common/paginations/dtos/page.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
 import { PageMetaDto } from 'src/common/paginations/dtos/page.metadata.dto';
+import { paginationKeyword } from 'src/utils/keywork-pagination';
 
 @Injectable()
 export class TypeQuestionsService {
@@ -26,7 +27,7 @@ export class TypeQuestionsService {
     try {
       const queryBuilder = this.repo.createQueryBuilder('tq');
       const { page, take, skip, order, search } = pageOptions;
-      const paginationKeys = ['page', 'take', 'skip', 'order', 'search'];
+      const paginationKeys: string[] = paginationKeyword;
 
       // Lọc theo các trường truyền vào query
       if (query && Object.keys(query).length > 0) {

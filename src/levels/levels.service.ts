@@ -7,6 +7,7 @@ import { Repository } from 'typeorm';
 import { PageOptionsDto } from 'src/common/paginations/dtos/page-option-dto';
 import { ItemDto, PageDto } from 'src/common/paginations/dtos/page.dto';
 import { PageMetaDto } from 'src/common/paginations/dtos/page.metadata.dto';
+import { paginationKeyword } from 'src/utils/keywork-pagination';
 
 @Injectable()
 export class LevelsService {
@@ -32,7 +33,7 @@ export class LevelsService {
     const queryBuilder = this.levelRepo.createQueryBuilder('level');
 
     const { skip, take, order = 'ASC', search } = pageOptions;
-    const paginationKeys = ['page', 'take', 'skip', 'order', 'search'];
+    const paginationKeys: string[] = paginationKeyword;
 
     // Lọc theo các trường cụ thể (nếu có)
     if (query && Object.keys(query).length > 0) {

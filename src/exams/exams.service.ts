@@ -1,27 +1,31 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateExamDto } from './dto/create-exam.dto';
 import { UpdateExamDto } from './dto/update-exam.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Exam } from './entities/exam.entity';
 import { Course } from 'src/courses/entities/course.entity';
 import { User } from 'src/users/entities/user.entity';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { PageOptionsDto } from 'src/common/paginations/dtos/page-option-dto';
 import { ItemDto, PageDto } from 'src/common/paginations/dtos/page.dto';
 import { PageMetaDto } from 'src/common/paginations/dtos/page.metadata.dto';
+import { paginationKeyword } from 'src/utils/keywork-pagination';
+import { Question } from 'src/questions/entities/question.entity';
 
 @Injectable()
 export class ExamsService {
   constructor(
     @InjectRepository(Exam)
     private readonly examRepo: Repository<Exam>,
+    @InjectRepository(Question)
+    private readonly questionRepo: Repository<Question>,
 
     @InjectRepository(Course)
     private readonly courseRepo: Repository<Course>,
-  ) {}
+  ) { }
 
   async create(createExamDto: CreateExamDto, user: User) {
-    const { courseId, title, description, durationMinutes } = createExamDto;
+    const { courseId, title, description, durationMinutes, questionIds = [] } = createExamDto;
 
     const course = await this.courseRepo.findOne({ where: { id: courseId } });
     if (!course) {
@@ -37,7 +41,7 @@ export class ExamsService {
     });
 
     if (existing) {
-      throw new NotFoundException('Tiêu đề đã tồn tại');
+      throw new BadRequestException('Tiêu đề đã tồn tại trong khóa học');
     }
 
     const exam = this.examRepo.create({
@@ -48,8 +52,19 @@ export class ExamsService {
       createdBy: user?.isAdmin ? user : null,
     });
 
-    return this.examRepo.save(exam);
+    const savedExam = await this.examRepo.save(exam);
+
+    // ✅ Gán các câu hỏi nếu có
+    if (questionIds.length > 0) {
+      await this.questionRepo.update(
+        { id: In(questionIds) },
+        { exam: savedExam }
+      );
+    }
+
+    return savedExam;
   }
+
 
   async findAll(
     pageOptions: PageOptionsDto,
@@ -61,11 +76,11 @@ export class ExamsService {
       .leftJoinAndSelect('exam.createdBy', 'createdBy');
 
     const { skip, take, order = 'ASC', search } = pageOptions;
-    const paginationKeys = ['page', 'take', 'skip', 'order', 'search'];
+    const pagination: string[] = paginationKeyword;
 
     if (query && Object.keys(query).length > 0) {
       for (const key of Object.keys(query)) {
-        if (!paginationKeys.includes(key)) {
+        if (!pagination.includes(key)) {
           queryBuilder.andWhere(`exam.${key} = :${key}`, { [key]: query[key] });
         }
       }

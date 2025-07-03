@@ -26,6 +26,10 @@ export class CreateQuestionDto extends OmitType(BaseDto, [] as const) {
 
     @ApiProperty()
     @IsNumber()
+    multipleChoiceId: number;
+
+    @ApiProperty()
+    @IsNumber()
     levelId: number;
 
     @ApiProperty()

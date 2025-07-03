@@ -17,6 +17,8 @@ import { CreateAnswerDto } from 'src/answers/dto/create-answer.dto';
 import { Class } from 'src/classes/entities/class.entity';
 import { Answer } from 'src/answers/entities/answer.entity';
 import { TypeQuestion } from 'src/type-questions/entities/type-question.entity';
+import { paginationKeyword } from 'src/utils/keywork-pagination';
+import { MultipeChoice } from 'src/multipe-choice/entities/multipe-choice.entity';
 
 @Injectable()
 export class QuestionsService {
@@ -28,6 +30,7 @@ export class QuestionsService {
     @InjectRepository(Subject) private subjectRepo: Repository<Subject>,
     @InjectRepository(Class) private classRepo: Repository<Class>,
     @InjectRepository(TypeQuestion) private typeQuestionRepo: Repository<TypeQuestion>,
+    @InjectRepository(MultipeChoice) private multipeChoiceRepo: Repository<MultipeChoice>,
     @Inject(forwardRef(() => AnswersService))
     private readonly answerService: AnswersService,
   ) { }
@@ -37,6 +40,7 @@ export class QuestionsService {
         content,
         answers,
         typeQuestionId,
+        multipleChoiceId,
         // examId,
         subjectId,
         topicId,
@@ -53,6 +57,7 @@ export class QuestionsService {
       const level = await this.levelRepo.findOne({ where: { id: levelId } });
       const checkclass = await this.classRepo.findOne({ where: { id: classId } });
       const typeQuestion = await this.typeQuestionRepo.findOne({ where: { id: typeQuestionId } });
+      const mc = await this.multipeChoiceRepo.findOne({ where: { id: multipleChoiceId } });
 
       // Kiểm tra trùng nội dung trong đề thi
       // const existing = await this.questionRepo.findOne({
@@ -60,13 +65,14 @@ export class QuestionsService {
       //   relations: ['exam'],
       // });
       // if (existing) throw new BadRequestException('Câu hỏi đã tồn tại trong đề thi này');
-      if (!subject || !topic || !level || !checkclass) {
-        throw new BadRequestException('Subject, Topic, Level hoặc Class không tồn tại');
+      if (!subject || !topic || !level || !checkclass || !typeQuestion || !mc) {
+        throw new BadRequestException('Subject, Topic, Level, Class, TypeQuestion, Multiple choice không tồn tại');
       }
       // Tạo câu hỏi
       const newQuestion = this.questionRepo.create({
         content,
         typeQuestion,
+        multipleChoice: mc,
         // exam,
         subject,
         topic,
@@ -108,12 +114,12 @@ export class QuestionsService {
       .leftJoinAndSelect('question.createdBy', 'createdBy');
 
     const { skip, take, order = 'ASC', search } = pageOptions;
-    const paginationKeys = ['page', 'take', 'skip', 'order', 'search'];
+    const pagination: string[] = paginationKeyword;
 
     // Lọc theo các trường truyền vào query (vd: subjectId, levelId, type, etc.)
     if (query && Object.keys(query).length > 0) {
       for (const key of Object.keys(query)) {
-        if (!paginationKeys.includes(key) && query[key] !== undefined) {
+        if (!pagination.includes(key) && query[key] !== undefined) {
           queryBuilder.andWhere(`question.${key} = :${key}`, { [key]: query[key] });
         }
       }
@@ -145,6 +151,7 @@ export class QuestionsService {
         'class',
         'answers',
         'typeQuestion',
+        'multipleChoice',
         'createdBy',
       ],
     });
@@ -168,6 +175,7 @@ export class QuestionsService {
     const {
       content,
       typeQuestionId,
+      multipleChoiceId,
       // examId,
       subjectId,
       topicId,
@@ -190,7 +198,11 @@ export class QuestionsService {
       if (!subject) throw new NotFoundException('Subject không tồn tại');
       question.subject = subject;
     }
-
+    if (multipleChoiceId !== undefined) {
+      const multipleChoice = await this.multipeChoiceRepo.findOne({ where: { id: multipleChoiceId } });
+      if (!multipleChoice) throw new NotFoundException('multipleChoice không tồn tại');
+      question.multipleChoice = multipleChoice;
+    }
     if (topicId !== undefined) {
       const topic = await this.topicRepo.findOne({ where: { id: topicId } });
       if (!topic) throw new NotFoundException('Topic không tồn tại');
@@ -231,4 +243,18 @@ export class QuestionsService {
     await this.questionRepo.softRemove(checkQuestion);
     return new ItemDto(checkQuestion);
   }
+  async findByType(typeCode: number): Promise<Question[]> {
+  const type = await this.multipeChoiceRepo.findOne({
+    where: { id: typeCode },
+  });
+
+  if (!type) {
+    throw new NotFoundException(`Không tồn tại`);
+  }
+
+  return this.questionRepo.find({
+    where: { multipleChoice: { id: type.id } },
+    relations: ['answers','subject', 'topic', 'level', 'class', 'multipleChoice', 'typeQuestion'],
+  });
+}
 }
