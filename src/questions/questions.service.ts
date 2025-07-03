@@ -111,6 +111,7 @@ export class QuestionsService {
       .leftJoinAndSelect('question.class', 'class')
       .leftJoinAndSelect('question.answers', 'answers')
       .leftJoinAndSelect('question.typeQuestion', 'typeQuestion')
+      .leftJoinAndSelect('question.multipleChoice', 'multipleChoice')
       .leftJoinAndSelect('question.createdBy', 'createdBy');
 
     const { skip, take, order = 'ASC', search } = pageOptions;

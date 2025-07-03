@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Req, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req, Query, UseGuards } from '@nestjs/common';
 import { ExamsService } from './exams.service';
 import { CreateExamDto } from './dto/create-exam.dto';
 import { UpdateExamDto } from './dto/update-exam.dto';
@@ -6,13 +6,17 @@ import { User } from 'src/users/entities/user.entity';
 import { PageOptionsDto } from 'src/common/paginations/dtos/page-option-dto';
 import { Exam } from './entities/exam.entity';
 import { Public } from 'src/auth/auth.decorator';
+import { RoleGuard } from 'src/roles/role.guard';
+import { Roles } from 'src/roles/role.decorator';
+import { Role } from 'src/roles/role.enum';
 
 @Controller('exams')
+@UseGuards(RoleGuard)
 export class ExamsController {
   constructor(private readonly examsService: ExamsService) { }
 
   @Post()
-  @Public()
+  @Roles(Role.ADMIN && Role.TEACHER)
   create(@Body() createExamDto: CreateExamDto, @Req() request: Request) {
     const user: User = request['user'] ?? null;
     return this.examsService.create(createExamDto, user);

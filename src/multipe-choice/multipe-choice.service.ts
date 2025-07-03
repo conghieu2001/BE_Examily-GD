@@ -15,13 +15,14 @@ export class MultipeChoiceService {
     @InjectRepository(MultipeChoice) private multipeChoiceRepo: Repository<MultipeChoice>
   ) { }
   async create(createMultipeChoiceDto: CreateMultipeChoiceDto) {
-    const { name } = createMultipeChoiceDto
+    const { name, type } = createMultipeChoiceDto
     const checkName = await this.multipeChoiceRepo.findOne({ where: { name } })
     if (checkName) {
       throw new HttpException('Tên đã tồn tại', 409)
     }
     const newMultipechoice = await this.multipeChoiceRepo.save({
-      name
+      name,
+      type
     })
     return newMultipechoice
   }
