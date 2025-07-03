@@ -3,26 +3,16 @@ import { Class } from "src/classes/entities/class.entity";
 import { BaseWithCreatedBy } from "src/common/entities/base-user-createdBy";
 import { Exam } from "src/exams/entities/exam.entity";
 import { Level } from "src/levels/entities/level.entity";
+import { MultipeChoice } from "src/multipe-choice/entities/multipe-choice.entity";
 import { Subject } from "src/subjects/entities/subject.entity";
 import { Topic } from "src/topics/entities/topic.entity";
 import { TypeQuestion } from "src/type-questions/entities/type-question.entity";
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from "typeorm";
-
-// export enum QuestionType {
-//     MULTIPLE_CHOICE = 'multiple_choice',
-//     ESSAY = 'essay',
-// }
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany, OneToOne } from "typeorm";
 
 @Entity()
 export class Question extends BaseWithCreatedBy {
     @Column()
     content: string
-    // @Column({
-    //     type: 'enum',
-    //     enum: QuestionType,
-    //     default: QuestionType.MULTIPLE_CHOICE,
-    // })
-    // type: QuestionType;
     @ManyToOne(() => Exam, exam => exam.questions, { onDelete: 'CASCADE' })
     @JoinColumn()
     exam: Exam;
@@ -47,4 +37,8 @@ export class Question extends BaseWithCreatedBy {
 
     @OneToMany(() => Answer, answer => answer.question, { cascade: true, onDelete: 'CASCADE' })
     answers: Answer[];
+
+    @ManyToOne(() => MultipeChoice, mc => mc.questions, { nullable: true })
+    @JoinColumn({ name: 'multipleChoiceId' })
+    multipleChoice: MultipeChoice;
 }

@@ -9,12 +9,12 @@ import { Public } from 'src/auth/auth.decorator';
 
 @Controller('questions')
 export class QuestionsController {
-  constructor(private readonly questionsService: QuestionsService) {}
+  constructor(private readonly questionsService: QuestionsService) { }
 
   @Post()
   @Public()
   create(@Body() createQuestionDto: CreateQuestionDto, @Req() request: Request) {
-      const user: User = request['user'] ?? null; 
+    const user: User = request['user'] ?? null;
     return this.questionsService.create(createQuestionDto, user);
   }
 
@@ -24,6 +24,11 @@ export class QuestionsController {
     return this.questionsService.findAll(pageOptionDto, query);
   }
 
+  @Get('getbymultipchoice/:id')
+  @Public()
+  async getByType(@Param('id') typeCode: number) {
+    return this.questionsService.findByType(typeCode);
+  }
   @Get(':id')
   @Public()
   findOne(@Param('id') id: string) {
@@ -33,6 +38,7 @@ export class QuestionsController {
   @Patch(':id')
   @Public()
   update(@Param('id') id: string, @Body() updateQuestionDto: UpdateQuestionDto) {
+    console.log('1')
     return this.questionsService.update(+id, updateQuestionDto);
   }
 

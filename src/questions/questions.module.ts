@@ -10,9 +10,10 @@ import { AnswersModule } from 'src/answers/answers.module';
 import { Class } from 'src/classes/entities/class.entity';
 import { Subject } from 'src/subjects/entities/subject.entity';
 import { TypeQuestion } from 'src/type-questions/entities/type-question.entity';
+import { MultipeChoice } from 'src/multipe-choice/entities/multipe-choice.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Question, Exam, Topic, Level, Subject, Class, TypeQuestion]), AnswersModule],
+  imports: [TypeOrmModule.forFeature([Question, Exam, Topic, Level, Subject, Class, TypeQuestion, MultipeChoice]), AnswersModule],
   controllers: [QuestionsController],
   providers: [QuestionsService],
 })
