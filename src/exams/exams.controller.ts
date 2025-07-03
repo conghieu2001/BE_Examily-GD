@@ -34,6 +34,16 @@ export class ExamsController {
     return this.examsService.findOne(+id);
   }
 
+  @Post('clone/:id')
+  @Roles(Role.ADMIN && Role.TEACHER)
+  async cloneExam(
+    @Param('id') id: string,
+    @Req() req: Request
+  ) {
+    const user = req['user'];
+    return await this.examsService.clone(+id, user);
+  }
+
   @Patch(':id')
   @Public()
   update(@Param('id') id: string, @Body() updateExamDto: UpdateExamDto) {
