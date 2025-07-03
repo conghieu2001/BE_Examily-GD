@@ -11,6 +11,7 @@ import { ItemDto, PageDto } from 'src/common/paginations/dtos/page.dto';
 import { PageMetaDto } from 'src/common/paginations/dtos/page.metadata.dto';
 import { paginationKeyword } from 'src/utils/keywork-pagination';
 import { Question } from 'src/questions/entities/question.entity';
+import { format } from 'date-fns';
 
 @Injectable()
 export class ExamsService {
@@ -148,5 +149,32 @@ export class ExamsService {
 
     await this.examRepo.softRemove(checkExam);
     return new ItemDto(checkExam);
+  }
+  async clone(id: number, user: User): Promise<Exam> {
+    const original = await this.examRepo.findOne({
+      where: { id },
+      relations: ['course', 'questions'],
+    });
+
+    if (!original) {
+      throw new NotFoundException(`Không tìm thấy bài thi với ID: ${id}`);
+    }
+
+    // 👇 Format ngày giờ hiện tại
+    const timestamp = format(new Date(), 'dd/MM/yyyy HH:mm');
+
+    // 👇 Tiêu đề mới có thêm thời gian
+    const newTitle = `${original.title} - Bản sao (${timestamp})`;
+
+    const cloneExam = this.examRepo.create({
+      title: newTitle,
+      description: original.description,
+      durationMinutes: original.durationMinutes,
+      course: original.course,
+      createdBy: user?.isAdmin ? user : null,
+      questions: original.questions,
+    });
+
+    return await this.examRepo.save(cloneExam);
   }
 }
