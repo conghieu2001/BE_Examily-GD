@@ -91,11 +91,20 @@ export class UsersController {
   }
 
 
+
+
   @Roles(Role.TEACHER) // Chỉ cho phép người dùng có vai trò admin hoặc user truy cập
   @Get() // Route GET /users
   async findAll(@Query() pageOptionsDto: PageOptionsDto, @Query() query: Partial<User>, @Req() request: Request) {
     const user = request['user'] ?? null; // Lấy user đang đăng nhập nếu có
     return this.usersService.findAll(pageOptionsDto, query, user);
+  }
+
+  @Roles(Role.TEACHER) // Chỉ cho phép người dùng có vai trò admin hoặc user truy cập
+  @Get("/count") // Route GET /users
+  async countUserByRole( @Req() request: Request) {
+    const user = request['user'] ?? null; // Lấy user đang đăng nhập nếu có
+    return this.usersService.countTotalAndByRole();
   }
 
   @Get(':id')

@@ -19,10 +19,10 @@ export class UsersService {
     @InjectRepository(User) private userRepo: Repository<User>
   ) { }
   async create(createUserDto: CreateUserDto, user: User) {
-    const { fullName, username, password, role = Role.STUDENT , isAdmin } = createUserDto;
-   
-    const exitsUser: User|null = await this.userRepo.findOne({ where: { username: username } });
-    
+    const { fullName, username, password, role = Role.STUDENT, isAdmin } = createUserDto;
+
+    const exitsUser: User | null = await this.userRepo.findOne({ where: { username: username } });
+
     if (exitsUser) {
       throw new BadRequestException('Username đã được sử dụng')
     }
@@ -32,18 +32,18 @@ export class UsersService {
       password: UserUtil.hashPassword(password.toString()),
       role: user.role === Role.ADMIN ? role : Role.STUDENT, // Chỉ admin mới có thể tạo user với role khác
       isAdmin: isAdmin ?? false,
-      avatar: '/public/default/default-user.jpg', 
+      avatar: '/public/default/default-user.jpg',
       createdBy: user, // Lưu ID của người tạo
     });
     return userCreate;
   }
 
 
-  async changePassword(id:number,dto: ChangePassDto, user: User): Promise<Partial<User>> {
+  async changePassword(id: number, dto: ChangePassDto, user: User): Promise<Partial<User>> {
     const { password, newPassword } = dto;
 
     // 1️⃣ Tìm user theo `userId`
-    const checkUser = await this.userRepo.findOne({ where: { id: id } , relations: ['createdBy'] });
+    const checkUser = await this.userRepo.findOne({ where: { id: id }, relations: ['createdBy'] });
     if (!checkUser) {
       throw new NotFoundException('User not found');
     }
@@ -53,7 +53,7 @@ export class UsersService {
     if (!isMatch) {
       throw new BadRequestException('Mật khẩu cũ không chính xác');
     }
-   
+
     // 3️⃣ Mã hóa mật khẩu mới
     const hashedPassword = await UserUtil.hashPassword(newPassword);
 
@@ -63,7 +63,7 @@ export class UsersService {
 
     return {
       ...newUser,
-      password: undefined, 
+      password: undefined,
     };
   }
 
@@ -72,8 +72,8 @@ export class UsersService {
     const queryBuilder = this.userRepo.createQueryBuilder('user').leftJoin('user.createdBy', 'createdBy') // 👈 không dùng leftJoinAndSelect
       .addSelect([
         'createdBy.fullName',
-    ])
-      
+      ])
+
     const { page, take, skip, order, search } = pageOptions;
     const pagination: string[] = paginationKeyword;
     if (user.role == Role.TEACHER) {
@@ -83,12 +83,12 @@ export class UsersService {
     if (query && Object.keys(query).length > 0) {
       for (const key of Object.keys(query)) {
         if (!pagination.includes(key)) {
-        
+
           queryBuilder.andWhere(`user.${key} = :${key}`, { [key]: query[key] });
         }
       }
     }
-  
+
     // Tìm kiếm theo tên hoặc email (tuỳ chỉnh)
     if (search) {
       queryBuilder.andWhere(
@@ -96,33 +96,33 @@ export class UsersService {
         { search: `%${search}%` }
       );
     }
-  
+
     queryBuilder.orderBy('user.createdAt', order)
       .skip(skip)
       .take(take);
-  
+
     const itemCount = await queryBuilder.getCount();
     const pageMetaDto = new PageMetaDto({ pageOptionsDto: pageOptions, itemCount });
-  
+
     const items = await queryBuilder.getMany();
-  
+
     return new PageDto(items, pageMetaDto);
   }
-  
+
 
   async findOne(id: number): Promise<ItemDto<User>> {
     const user = await this.userRepo.findOne({
       where: { id },
     });
-  
+
     if (!user) {
       throw new NotFoundException(`Không tìm thấy người dùng với ID: ${id}`);
     }
-  
+
     return new ItemDto(user);
   }
 
-  
+
 
   async blockUser(id: number, currentUser: User): Promise<User> {
     const targetUser = await this.userRepo.findOne({ where: { id }, relations: ['createdBy'] });
@@ -133,7 +133,7 @@ export class UsersService {
 
     const isTargetAdmin = targetUser.role === Role.ADMIN;
     const isTargetTeacher = targetUser.role === Role.TEACHER;
-    const isCurrentAdmin = currentUser.role === Role.ADMIN;
+    const isCurrentAdmin = currentUser.role === Role.ADMIN;                                                                                                            
 
     if (isTargetAdmin) {
       throw new BadRequestException(`Bạn không có quyền chặn người dùng này`);
@@ -174,9 +174,9 @@ export class UsersService {
 
     return targetUser;
   }
-  
 
-  async resetPassword(id: number, user:User): Promise<User> {
+
+  async resetPassword(id: number, user: User): Promise<User> {
     const targetUser = await this.userRepo.findOne({ where: { id }, relations: ['createdBy'] });
 
     if (!targetUser) {
@@ -207,7 +207,48 @@ export class UsersService {
 
     return user;
   }
-  
 
-  
+
+  async countTotalAndByRole(): Promise<ItemDto<{
+    total: number;
+    role: Record<Role, number>;
+  }>> {
+    // Query: group users by role
+    const rows = await this.userRepo
+      .createQueryBuilder('user')
+      .select(['user.role AS role', 'COUNT(*)::int AS count'])
+      .where('user.deletedAt IS NULL') // If you're using soft delete
+      .groupBy('user.role')
+      .getRawMany<{ role: Role; count: number }>();
+
+    // Calculate total number of users
+    const total = rows.reduce((sum, row) => sum + row.count, 0);
+
+    // Initialize result object with all roles (even if some have 0 users)
+    const byRole: Record<Role, number> = {} as Record<Role, number>;
+    const byRoleConvert: Record<Role, number> = {} as Record<Role, number>;
+    const roleLabelMap: Record<string, string> = {
+      'Quản trị viên': 'Admin',
+      'Giáo viên': 'Teacher',
+      'Học sinh': 'Student',
+    };
+
+    for (const role of Object.values(Role)) {
+      byRoleConvert[roleLabelMap[role]] = 0;
+    }
+
+    // Fill in the actual counts
+    for (const row of rows) {
+      byRole[row.role] = row.count;
+
+      byRoleConvert[roleLabelMap[row.role] || row.role] = row.count; // Map role to enum
+    }
+
+
+    return new ItemDto({ total, role: byRoleConvert });
+  }
+
+
+
+
 }
