@@ -7,15 +7,14 @@ import { MultipeChoice } from "src/multipe-choice/entities/multipe-choice.entity
 import { Subject } from "src/subjects/entities/subject.entity";
 import { Topic } from "src/topics/entities/topic.entity";
 import { TypeQuestion } from "src/type-questions/entities/type-question.entity";
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany, OneToOne } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToMany, ManyToOne, OneToMany, OneToOne } from "typeorm";
 
 @Entity()
 export class Question extends BaseWithCreatedBy {
     @Column()
     content: string
-    @ManyToOne(() => Exam, exam => exam.questions, { onDelete: 'CASCADE' })
-    @JoinColumn()
-    exam: Exam;
+    @ManyToMany(() => Exam, exam => exam.questions)
+    exams: Exam[];
 
     @ManyToOne(() => Subject, { nullable: true })
     @JoinColumn({ name: "subjectId" })

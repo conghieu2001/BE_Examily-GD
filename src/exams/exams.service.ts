@@ -24,7 +24,7 @@ export class ExamsService {
     private readonly courseRepo: Repository<Course>,
   ) { }
 
-  async create(createExamDto: CreateExamDto, user: User) {
+  async create(createExamDto: CreateExamDto, user: User): Promise<Exam> {
     const { courseId, title, description, durationMinutes, questionIds = [] } = createExamDto;
 
     const course = await this.courseRepo.findOne({ where: { id: courseId } });
@@ -34,7 +34,7 @@ export class ExamsService {
 
     const existing = await this.examRepo.findOne({
       where: {
-        title: title,
+        title,
         course: { id: courseId }
       },
       relations: ['course']
@@ -52,20 +52,14 @@ export class ExamsService {
       createdBy: user?.isAdmin ? user : null,
     });
 
-    const savedExam = await this.examRepo.save(exam);
-
     // ✅ Gán các câu hỏi nếu có
     if (questionIds.length > 0) {
-      await this.questionRepo.update(
-        { id: In(questionIds) },
-        { exam: savedExam }
-      );
+      const questions = await this.questionRepo.findBy({ id: In(questionIds) });
+      exam.questions = questions;
     }
 
-    return savedExam;
+    return await this.examRepo.save(exam);
   }
-
-
   async findAll(
     pageOptions: PageOptionsDto,
     query: Partial<Exam>,
@@ -73,6 +67,7 @@ export class ExamsService {
     const queryBuilder = this.examRepo
       .createQueryBuilder('exam')
       .leftJoinAndSelect('exam.course', 'course')
+      .leftJoinAndSelect('exam.questions', 'questions')
       .leftJoinAndSelect('exam.createdBy', 'createdBy');
 
     const { skip, take, order = 'ASC', search } = pageOptions;
@@ -102,23 +97,24 @@ export class ExamsService {
 
     return new PageDto(items, pageMetaDto);
   }
-
   async findOne(id: number): Promise<ItemDto<Exam>> {
-    const exam = await this.examRepo.findOne({ where: { id }, relations: ['createdBy', 'course'] });
+    const exam = await this.examRepo.findOne({ where: { id }, relations: ['createdBy', 'course', 'questions'] });
     if (!exam) {
       throw new NotFoundException(`Không tìm thấy Exam với ID: ${id}`);
     }
     return new ItemDto(exam);
   }
-
   async update(id: number, updateExamDto: UpdateExamDto): Promise<Exam> {
-    const exam = await this.examRepo.findOne({ where: { id } });
+    const exam = await this.examRepo.findOne({
+      where: { id },
+      relations: ['createdBy', 'course', 'questions'],
+    });
 
     if (!exam) {
       throw new NotFoundException(`Không tìm thấy bài thi với ID: ${id}`);
     }
 
-    const { title, description, durationMinutes } = updateExamDto;
+    const { title, description, durationMinutes, questionIds } = updateExamDto;
 
     if (title !== undefined) {
       exam.title = title;
@@ -132,13 +128,18 @@ export class ExamsService {
       exam.durationMinutes = durationMinutes;
     }
 
+    // ✅ Nếu truyền danh sách câu hỏi → cập nhật lại
+    if (Array.isArray(questionIds)) {
+      const questions = await this.questionRepo.findBy({ id: In(questionIds) });
+      exam.questions = questions;
+    }
+
     return await this.examRepo.save(exam);
   }
-
   async remove(id: number): Promise<ItemDto<Exam>> {
     const checkExam = await this.examRepo.findOne({
       where: { id },
-      relations: ['createdBy', 'course'],
+      relations: ['createdBy', 'course', 'questions'],
     });
 
     if (!checkExam) {

@@ -4,6 +4,8 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
+  ManyToMany,
+  JoinTable,
 } from 'typeorm';
 import { BaseWithCreatedBy } from 'src/common/entities/base-user-createdBy';
 import { Course } from 'src/courses/entities/course.entity';
@@ -24,7 +26,7 @@ export class Exam extends BaseWithCreatedBy {
   @JoinColumn({ name: 'course_id' })
   course: Course;
 
-  @OneToMany(() => Question, question => question.exam)
+  @ManyToMany(() => Question, question => question.exams)
+  @JoinTable()
   questions: Question[];
 }
- 
