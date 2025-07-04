@@ -9,16 +9,17 @@ import { Role } from 'src/roles/role.enum';
 import { PageOptionsDto } from 'src/common/paginations/dtos/page-option-dto';
 import { Course } from './entities/course.entity';
 import { Public } from 'src/auth/auth.decorator';
+import { JoinCourseDto } from './dto/join-course.dto';
 
 @Controller('courses')
 @UseGuards(RoleGuard)
 export class CoursesController {
-  constructor(private readonly coursesService: CoursesService) {}
+  constructor(private readonly coursesService: CoursesService) { }
 
   @Post()
   @Roles(Role.ADMIN && Role.TEACHER)
   create(@Body() createCourseDto: CreateCourseDto, @Req() request: Request) {
-      const user: User = request['user'] ?? null;
+    const user: User = request['user'] ?? null;
     return this.coursesService.create(createCourseDto, user);
   }
 
@@ -26,6 +27,26 @@ export class CoursesController {
   @Public()
   findAll(@Query() pageOptionDto: PageOptionsDto, @Query() query: Partial<Course>) {
     return this.coursesService.findAll(pageOptionDto, query);
+  }
+
+  @Post(':id/join')
+  @Public()
+  async joinCourse(
+    @Param('id') id: number,
+    @Req() request: Request,
+    @Body() dto: JoinCourseDto,
+  ) {
+    const user: User = request['user'] ?? null;
+    return this.coursesService.joinCourse(id, user, dto);
+  }
+
+  @Delete(':courseId/remove-user/:userId')
+  @Roles(Role.ADMIN && Role.TEACHER)
+  async removeStudent(
+    @Param('courseId') courseId: number,
+    @Param('userId') userId: number,
+  ) {
+    return this.coursesService.removeUserFromCourse(courseId, userId);
   }
 
   @Get(':id')

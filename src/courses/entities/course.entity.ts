@@ -1,6 +1,7 @@
-import { Column, Entity, OneToMany } from 'typeorm';
+import { Column, Entity, JoinTable, ManyToMany, OneToMany } from 'typeorm';
 import { BaseWithCreatedBy } from 'src/common/entities/base-user-createdBy';
-import { Exam } from 'src/exams/entities/exam.entity';
+import { CourseByExam } from 'src/course-by-exams/entities/course-by-exam.entity';
+import { User } from 'src/users/entities/user.entity';
 
 @Entity()
 export class Course extends BaseWithCreatedBy {
@@ -10,9 +11,20 @@ export class Course extends BaseWithCreatedBy {
   @Column()
   description: string;
 
-  @Column()
-  password: string
+  @Column({ nullable: true })
+  password?: string;
 
-//   @OneToMany(() => Exam, exam => exam.course)
-//   exams: Exam[];
+  @Column({ default: false })
+  isLocked: boolean;
+
+  @OneToMany(() => CourseByExam, courseByExam => courseByExam.course)
+  courseByExams: CourseByExam[];
+
+  @ManyToMany(() => User, user => user.joinedCourses, { cascade: true })
+  @JoinTable({
+    name: 'course_students',
+    joinColumn: { name: 'courseId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'userId', referencedColumnName: 'id' },
+  })
+  users: User[];
 }

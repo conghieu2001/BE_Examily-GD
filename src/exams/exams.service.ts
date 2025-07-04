@@ -44,11 +44,11 @@ export class ExamsService {
         title,
         // course: { id: courseId }
       },
-      relations: ['course']
+      // relations: ['course']
     });
 
     if (existing) {
-      throw new BadRequestException('Tiêu đề đã tồn tại trong khóa học');
+      throw new BadRequestException('Tiêu đề đã tồn tại');
     }
 
     const exam = this.examRepo.create({

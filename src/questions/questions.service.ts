@@ -166,7 +166,7 @@ export class QuestionsService {
   async update(id: number, updateDto: UpdateQuestionDto): Promise<ItemDto<Question>> {
     const question = await this.questionRepo.findOne({
       where: { id },
-      relations: ['createdBy', 'exam', 'subject', 'topic', 'level', 'class'],
+      relations: ['createdBy', 'subject', 'topic', 'level', 'class'],
     });
 
     if (!question) {
@@ -234,7 +234,7 @@ export class QuestionsService {
   async remove(id: number): Promise<ItemDto<Question>> {
     const checkQuestion = await this.questionRepo.findOne({
       where: { id },
-      relations: ['createdBy', 'exam'],
+      relations: ['createdBy'],
     });
 
     if (!checkQuestion) {
@@ -245,17 +245,17 @@ export class QuestionsService {
     return new ItemDto(checkQuestion);
   }
   async findByType(typeCode: number): Promise<Question[]> {
-  const type = await this.multipeChoiceRepo.findOne({
-    where: { id: typeCode },
-  });
+    const type = await this.multipeChoiceRepo.findOne({
+      where: { id: typeCode },
+    });
 
-  if (!type) {
-    throw new NotFoundException(`Không tồn tại`);
+    if (!type) {
+      throw new NotFoundException(`Không tồn tại`);
+    }
+
+    return this.questionRepo.find({
+      where: { multipleChoice: { id: type.id } },
+      relations: ['answers', 'subject', 'topic', 'level', 'class', 'multipleChoice', 'typeQuestion'],
+    });
   }
-
-  return this.questionRepo.find({
-    where: { multipleChoice: { id: type.id } },
-    relations: ['answers','subject', 'topic', 'level', 'class', 'multipleChoice', 'typeQuestion'],
-  });
-}
 }

@@ -169,7 +169,7 @@ export class QuestionsController {
     return this.questionsService.findOne(+id);
   }
 
-  @Put(':id')
+  @Patch(':id')
   @Public()
   update(@Param('id') id: string, @Body() updateQuestionDto: UpdateQuestionDto) {
     console.log('1')
