@@ -22,9 +22,20 @@ export class Exam extends BaseWithCreatedBy {
   @Column({ name: 'duration_minutes', type: 'int' })
   durationMinutes: number;
 
-  @ManyToOne(() => Course, course => course.exams, { nullable: false, onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'course_id' })
-  course: Course;
+  @Column()
+  totalMultipleChoiceScore: number;
+  @Column({ nullable: true })
+  totalMultipleChoiceScorePartI: number;
+  @Column({ nullable: true })
+  totalMultipleChoiceScorePartII: number;
+  @Column({ nullable: true })
+  totalMultipleChoiceScorePartIII: number;
+  @Column()
+  totalEssayScore: number;
+
+  // @ManyToOne(() => Course, course => course.exams, { nullable: false, onDelete: 'CASCADE' })
+  // @JoinColumn({ name: 'course_id' })
+  // course: Course;
 
   @ManyToMany(() => Question, question => question.exams)
   @JoinTable()

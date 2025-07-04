@@ -1,5 +1,5 @@
 import { ApiProperty, OmitType } from "@nestjs/swagger";
-import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { IsArray, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from "class-validator";
 import { BaseDto } from "src/common/dto/base.dto";
 
 export class CreateExamDto extends OmitType(BaseDto, [] as const) {
@@ -16,9 +16,24 @@ export class CreateExamDto extends OmitType(BaseDto, [] as const) {
     @IsNotEmpty()
     durationMinutes: number;
     @ApiProperty()
-    @IsInt()
-    @IsNotEmpty()
-    courseId: number;
+    @IsNumber()
+    totalMultipleChoiceScore: number;
+    @ApiProperty()
+    @IsNumber()
+    totalMultipleChoiceScorePartI: number;
+    @ApiProperty()
+    @IsNumber()
+    totalMultipleChoiceScorePartII: number;
+    @ApiProperty()
+    @IsNumber()
+    totalMultipleChoiceScorePartIII: number;
+    @ApiProperty()
+    @IsNumber()
+    totalEssayScore: number;
+    // @ApiProperty()
+    // @IsInt()
+    // @IsNotEmpty()
+    // courseId: number;
     @ApiProperty({ type: [Number]})
     @IsArray()
     @IsInt({ each: true })

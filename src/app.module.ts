@@ -22,6 +22,7 @@ import { ClassesModule } from './classes/classes.module';
 import { LevelsModule } from './levels/levels.module';
 import { MultipeChoiceModule } from './multipe-choice/multipe-choice.module';
 import { TypeQuestionsModule } from './type-questions/type-questions.module';
+import { CourseByExamsModule } from './course-by-exams/course-by-exams.module';
 
 @Module({
   imports: [
@@ -63,7 +64,7 @@ import { TypeQuestionsModule } from './type-questions/type-questions.module';
     MultipeChoiceModule,
     SubjectsModule,
     TopicsModule, 
-    AnswersModule, TypeQuestionsModule,
+    AnswersModule, TypeQuestionsModule, CourseByExamsModule,
   ],
   controllers: [],
   providers: [

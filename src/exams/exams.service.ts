@@ -26,17 +26,23 @@ export class ExamsService {
   ) { }
 
   async create(createExamDto: CreateExamDto, user: User): Promise<Exam> {
-    const { courseId, title, description, durationMinutes, questionIds = [] } = createExamDto;
+    const {
+      // courseId,
+      title, description, durationMinutes, questionIds = [], totalEssayScore,
+      totalMultipleChoiceScore,
+      totalMultipleChoiceScorePartI,
+      totalMultipleChoiceScorePartII,
+      totalMultipleChoiceScorePartIII, } = createExamDto;
 
-    const course = await this.courseRepo.findOne({ where: { id: courseId } });
-    if (!course) {
-      throw new NotFoundException('Course không tồn tại');
-    }
+    // const course = await this.courseRepo.findOne({ where: { id: courseId } });
+    // if (!course) {
+    //   throw new NotFoundException('Course không tồn tại');
+    // }
 
     const existing = await this.examRepo.findOne({
       where: {
         title,
-        course: { id: courseId }
+        // course: { id: courseId }
       },
       relations: ['course']
     });
@@ -49,7 +55,12 @@ export class ExamsService {
       title,
       description,
       durationMinutes,
-      course,
+      // course,
+      totalEssayScore,
+      totalMultipleChoiceScore,
+      totalMultipleChoiceScorePartI,
+      totalMultipleChoiceScorePartII,
+      totalMultipleChoiceScorePartIII,
       createdBy: user?.isAdmin ? user : null,
     });
 
@@ -67,7 +78,7 @@ export class ExamsService {
   ): Promise<PageDto<Exam>> {
     const queryBuilder = this.examRepo
       .createQueryBuilder('exam')
-      .leftJoinAndSelect('exam.course', 'course')
+      // .leftJoinAndSelect('exam.course', 'course')
       .leftJoinAndSelect('exam.questions', 'questions')
       .leftJoinAndSelect('exam.createdBy', 'createdBy');
 
@@ -99,7 +110,7 @@ export class ExamsService {
     return new PageDto(items, pageMetaDto);
   }
   async findOne(id: number): Promise<ItemDto<Exam>> {
-    const exam = await this.examRepo.findOne({ where: { id }, relations: ['createdBy', 'course', 'questions'] });
+    const exam = await this.examRepo.findOne({ where: { id }, relations: ['createdBy', 'questions', 'questions.answers', 'questions.typeQuestion', 'questions.class', 'questions.level', 'questions.multipleChoice'] });
     if (!exam) {
       throw new NotFoundException(`Không tìm thấy Exam với ID: ${id}`);
     }
@@ -108,14 +119,24 @@ export class ExamsService {
   async update(id: number, updateExamDto: UpdateExamDto): Promise<Exam> {
     const exam = await this.examRepo.findOne({
       where: { id },
-      relations: ['createdBy', 'course', 'questions'],
+      relations: ['createdBy', 'questions'],
     });
 
     if (!exam) {
       throw new NotFoundException(`Không tìm thấy bài thi với ID: ${id}`);
     }
 
-    const { title, description, durationMinutes, questionIds } = updateExamDto;
+    const {
+      title,
+      description,
+      durationMinutes,
+      questionIds,
+      totalMultipleChoiceScore,
+      totalMultipleChoiceScorePartI,
+      totalMultipleChoiceScorePartII,
+      totalMultipleChoiceScorePartIII,
+      totalEssayScore,
+    } = updateExamDto;
 
     if (title !== undefined) {
       exam.title = title;
@@ -127,6 +148,26 @@ export class ExamsService {
 
     if (durationMinutes !== undefined) {
       exam.durationMinutes = durationMinutes;
+    }
+
+    if (totalMultipleChoiceScore !== undefined) {
+      exam.totalMultipleChoiceScore = totalMultipleChoiceScore;
+    }
+
+    if (totalMultipleChoiceScorePartI !== undefined) {
+      exam.totalMultipleChoiceScorePartI = totalMultipleChoiceScorePartI;
+    }
+
+    if (totalMultipleChoiceScorePartII !== undefined) {
+      exam.totalMultipleChoiceScorePartII = totalMultipleChoiceScorePartII;
+    }
+
+    if (totalMultipleChoiceScorePartIII !== undefined) {
+      exam.totalMultipleChoiceScorePartIII = totalMultipleChoiceScorePartIII;
+    }
+
+    if (totalEssayScore !== undefined) {
+      exam.totalEssayScore = totalEssayScore;
     }
 
     // ✅ Nếu truyền danh sách câu hỏi → cập nhật lại
@@ -170,9 +211,16 @@ export class ExamsService {
       title: newTitle,
       description: original.description,
       durationMinutes: original.durationMinutes,
-      course: original.course,
+      // course: original.course,
       createdBy: user?.isAdmin ? user : null,
       questions: original.questions,
+
+      // ✅ Sao chép tất cả các trường điểm
+      totalMultipleChoiceScore: original.totalMultipleChoiceScore,
+      totalMultipleChoiceScorePartI: original.totalMultipleChoiceScorePartI,
+      totalMultipleChoiceScorePartII: original.totalMultipleChoiceScorePartII,
+      totalMultipleChoiceScorePartIII: original.totalMultipleChoiceScorePartIII,
+      totalEssayScore: original.totalEssayScore,
     });
 
     return await this.examRepo.save(cloneExam);

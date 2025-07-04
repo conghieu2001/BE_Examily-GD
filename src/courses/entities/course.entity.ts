@@ -10,7 +10,9 @@ export class Course extends BaseWithCreatedBy {
   @Column()
   description: string;
 
+  @Column()
+  password: string
 
-  @OneToMany(() => Exam, exam => exam.course)
-  exams: Exam[];
+//   @OneToMany(() => Exam, exam => exam.course)
+//   exams: Exam[];
 }
