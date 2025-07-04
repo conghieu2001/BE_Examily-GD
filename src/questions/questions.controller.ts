@@ -126,7 +126,7 @@ export class QuestionsController {
           subjectId: subject.id,
           topicId: topic.id,
           multipleChoiceId: mc.id,
-          score: Number(item['Điểm']) || 1,
+          // score: Number(item['Điểm']) || 1,
         };
 
         const created = await this.questionsService.create(createQuestionDto, user);

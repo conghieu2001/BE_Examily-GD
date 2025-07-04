@@ -32,9 +32,9 @@ export class CreateQuestionDto extends OmitType(BaseDto, [] as const) {
     @IsNumber()
     levelId: number;
 
-    @ApiProperty()
-    @IsNumber()
-    score: number;
+    // @ApiProperty()
+    // @IsNumber()
+    // score: number;
 
     @ApiProperty()
     @IsNumber()

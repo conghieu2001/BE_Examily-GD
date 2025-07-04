@@ -25,8 +25,8 @@ export class Question extends BaseWithCreatedBy {
     @ManyToOne(() => Level, { nullable: true })
     @JoinColumn({ name: "levelId" })
     level: Level;
-    @Column("decimal", { precision: 5, scale: 2, nullable: true })
-    score: number;
+    // @Column("decimal", { precision: 5, scale: 2, nullable: true })
+    // score: number;
     @ManyToOne(() => Class, { nullable: true })
     @JoinColumn({ name: 'classId' })
     class: Class;

@@ -46,7 +46,7 @@ export class QuestionsService {
         topicId,
         levelId,
         classId,
-        score,
+        // score,
       } = createQuestionDto;
 
       // Tìm các entity liên quan
@@ -78,7 +78,7 @@ export class QuestionsService {
         topic,
         level,
         class: checkclass,
-        score: Number(score),
+        // score: Number(score),
         createdBy: user,
       } as DeepPartial<Question>);
       const question = await this.questionRepo.save(newQuestion);
@@ -182,11 +182,11 @@ export class QuestionsService {
       topicId,
       levelId,
       classId,
-      score,
+      // score,
     } = updateDto;
 
     if (content !== undefined) question.content = content;
-    if (score !== undefined) question.score = score;
+    // if (score !== undefined) question.score = score;
 
     // if (examId !== undefined) {
     //   const exam = await this.examRepo.findOne({ where: { id: examId } });

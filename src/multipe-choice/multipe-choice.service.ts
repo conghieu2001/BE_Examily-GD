@@ -75,7 +75,7 @@ export class MultipeChoiceService {
   }
 
   async update(id: number, updateMultipeChoiceDto: UpdateMultipeChoiceDto): Promise<MultipeChoice> {
-    const { name } = updateMultipeChoiceDto;
+    const { name, type } = updateMultipeChoiceDto;
 
     const multipechoice = await this.multipeChoiceRepo.findOne({ where: { id } });
     if (!multipechoice) {
@@ -89,6 +89,9 @@ export class MultipeChoiceService {
         throw new BadRequestException(`Multipechoice với tên "${name}" đã tồn tại.`);
       }
       multipechoice.name = name;
+    }
+    if (type && type !== multipechoice.type) {
+      multipechoice.type = type;
     }
 
     return this.multipeChoiceRepo.save(multipechoice);
