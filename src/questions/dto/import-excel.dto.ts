@@ -11,13 +11,13 @@ export class ImportExcelQuestion extends OmitType(BaseDto, [] as const) {
     @IsNumber()
     classId: number;
 
-    @ApiProperty()
-    @IsNumber()
-    topicId: number;
+    // @ApiProperty()
+    // @IsNumber()
+    // topicId: number;
 
-    @ApiProperty()
-    @IsNumber()
-    multipleChoiceId: number;
+    // @ApiProperty()
+    // @IsNumber()
+    // multipleChoiceId: number;
 
     @ApiProperty()
     @IsNumber()

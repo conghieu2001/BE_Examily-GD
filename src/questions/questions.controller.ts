@@ -75,48 +75,58 @@ export class QuestionsController {
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const data: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet);
 
-    if (!data || data.length === 0) {
-      throw new NotFoundException('Không tìm thấy dữ liệu trong file Excel');
+    // ✅ Lọc các dòng hợp lệ: có nội dung câu hỏi và là string
+    const validData = data.filter(
+      (row) =>
+        row['Nội dung câu hỏi'] &&
+        typeof row['Nội dung câu hỏi'] === 'string' &&
+        row['A (Đáp án)'] // ít nhất có 1 đáp án
+    );
+
+    if (!validData || validData.length === 0) {
+      throw new NotFoundException('Không tìm thấy dữ liệu hợp lệ trong file Excel');
     }
 
-    const { classId, subjectId, topicId, typeQuestionId } = body
+    const { classId, subjectId, typeQuestionId } = body;
     const classEntity = await this.classRepo.findOne({ where: { id: Number(classId) } });
     const subject = await this.subjectRepo.findOne({ where: { id: Number(subjectId) } });
-    const topic = await this.topicRepo.findOne({ where: { id: Number(topicId) } });
     const typeQuestion = await this.typeQuestionRepo.findOne({ where: { id: Number(typeQuestionId) } });
-    if (!classEntity || !subject || !topic || !typeQuestion) {
-      throw new BadRequestException('classId, subjectId, topicId, typeQuestionId không hợp lệ');
+
+    if (!classEntity || !subject || !typeQuestion) {
+      throw new BadRequestException('classId, subjectId, typeQuestionId không hợp lệ');
     }
 
     const results: any[] = [];
     const errors: { message: string; row: number }[] = [];
 
-    for (let i = 0; i < data.length; i++) {
-      const item = data[i];
+    for (let i = 0; i < validData.length; i++) {
+      const item = validData[i];
       try {
-        // === Lấy hoặc tạo các entity liên quan theo name ===
-        // const classEntity = await this.classRepo.findOne({ where: { name: item['Lớp'] } })
-        // const subject = await this.subjectRepo.findOne({ where: { name: item['Môn'] } })
-        // const topic = await this.topicRepo.findOne({ where: { name: item['Chủ đề'] } })
-        const level = await this.levelRepo.findOne({ where: { name: item['Mức độ'] } })
-        // const typeQuestion = await this.typeQuestionRepo.findOne({ where: { name: item['Loại câu hỏi'] } })
-        const mc = await this.multipleChoiceRepo.findOne({ where: { name: item['Nhóm trắc nghiệm'] } })
-        if (!level || !mc) {
+        const topic = await this.topicRepo.findOne({ where: { name: item['Chủ đề'] } });
+        const level = await this.levelRepo.findOne({ where: { name: item['Mức độ'] } });
+        const mc = await this.multipleChoiceRepo.findOne({ where: { name: item['Nhóm trắc nghiệm'] } });
+
+        if (!topic || !level || !mc) {
           errors.push({
-            message: 'Thiếu một trong các entity: Level, Multiple choice',
+            message: 'Thiếu một trong các entity: Chủ đề, Mức độ, Nhóm trắc nghiệm',
             row: i + 2,
           });
           continue;
         }
-        // === Tạo danh sách đáp án (lưu hết, không cần đúng/sai) ===
-        const answers: CreateAnswerDto[] = ['A (Đáp án)', 'B (Đáp án)', 'C (Đáp án)', 'D (Đáp án)']
-          .map((label) => {
-            const content = item[label];
-            return content ? { content: content.toString(), isCorrect: false } : null;
-          })
-          .filter((a): a is CreateAnswerDto => a !== null);
 
-        // === Tạo DTO câu hỏi ===
+        // ✅ Xác định đáp án đúng
+        const correctLabel = (item['Đáp án đúng'] || '').toString().trim().toUpperCase();
+        const answers: CreateAnswerDto[] = ['A', 'B', 'C', 'D'].map((label) => {
+          const content = item[`${label} (Đáp án)`];
+          return content
+            ? {
+              content: content.toString(),
+              isCorrect: correctLabel === label,
+            }
+            : null;
+        }).filter((a): a is CreateAnswerDto => a !== null);
+
+        // ✅ Tạo câu hỏi DTO
         const createQuestionDto: CreateQuestionDto = {
           content: item['Nội dung câu hỏi']?.toString() || '',
           answers,
@@ -126,17 +136,15 @@ export class QuestionsController {
           subjectId: subject.id,
           topicId: topic.id,
           multipleChoiceId: mc.id,
-          // score: Number(item['Điểm']) || 1,
         };
 
         const created = await this.questionsService.create(createQuestionDto, user);
         results.push(created);
-
       } catch (error) {
         console.error(error);
         errors.push({
           message: error.message || 'Lỗi không xác định',
-          row: i + 2, // Excel row
+          row: i + 2,
         });
       }
     }
@@ -144,12 +152,14 @@ export class QuestionsController {
     return {
       success: true,
       total: data.length,
+      validRows: validData.length,
       successCount: results.length,
       errorCount: errors.length,
       results,
       errors,
     };
   }
+
 
 
   @Get()
