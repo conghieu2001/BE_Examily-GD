@@ -171,7 +171,7 @@ export class QuestionsService {
 
     return new ItemDto(question);
   }
-  async update(id: number, updateDto: UpdateQuestionDto): Promise<ItemDto<Question>> {
+  async update(id: number, updateDto: UpdateQuestionDto) {
     // console.log(id, 'efef')
     const question = await this.questionRepo.findOne({
       where: { id },
@@ -230,36 +230,22 @@ export class QuestionsService {
       if (!classEntity) throw new NotFoundException('Class không tồn tại');
       question.class = classEntity;
     }
-
     // ✅ Cập nhật từng answer theo ID
     if (answers && Array.isArray(answers)) {
       // console.log(answers)
       
       for (let i=0; i<answers.length; i++) {
         const a = answers[i] as any
-        // console.log({
-        //   content: a.content,
-        //   isCorrect: a.isCorrect
-        // }, 'aaaa')
-        const aaa =await this.answerRepo.update(a.answerId, {
+        const answer = question.answers[i]
+    
+        const updated = this.answerRepo.merge(answer, {
           content: a.content,
-          isCorrect: a.isCorrect
+          isCorrect: a.isCorrect,
         });
-        console.log(aaa, i)
+        await this.answerRepo.update(answer.id, updated);
       }
     }
-    // if (answers && Array.isArray(answers)) {
-    //   await Promise.all(
-    //     answers.map((a: any) =>
-    //       this.answerService.update(a.answerId, {
-    //         content: a.content,
-    //         isCorrect: a.isCorrect,
-    //       }),
-    //     ),
-    //   );
-    // }
     const updated = await this.questionRepo.save(question);
-    // console.log(question, 'ques')
     return new ItemDto(updated);
   }
 
