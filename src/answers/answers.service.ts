@@ -89,21 +89,32 @@ export class AnswersService {
   }
 
   async update(id: number, updateAnswerDto: UpdateAnswerDto) {
-    const { content, isCorrect } = updateAnswerDto;
+    const { content, isCorrect } = updateAnswerDto; 
+    console.log(id,updateAnswerDto)
 
-
-    const example = await this.answerRepo.findOne({ where: { id } });
-
-    if (!example) {
+    const answer = await this.answerRepo.findOne({ where: { id } });
+    if (!answer) {
       throw new NotFoundException(`Answer with ID ${id} not found`);
     }
 
-    this.answerRepo.merge(example, { content, isCorrect });
+    // Chỉ cập nhật nếu khác
+    if (content !== undefined && answer.content !== content) {
+      answer.content = content;
+    }
 
-    await this.answerRepo.update(id, example);
+    if (isCorrect !== undefined) {
+      const normalizedIsCorrect =
+        typeof isCorrect === 'string' ? isCorrect === 'true' : !!isCorrect;
 
-    return new ItemDto(example);
+      if (answer.isCorrect !== normalizedIsCorrect) {
+        answer.isCorrect = normalizedIsCorrect;
+      }
+    }
+    this.answerRepo.merge(answer, updateAnswerDto)
+    console.log(answer,'answer')
+    return await this.answerRepo.update(id,answer);
   }
+
 
   async remove(id: number, user: User) {
     const example = await this.answerRepo.findOne({

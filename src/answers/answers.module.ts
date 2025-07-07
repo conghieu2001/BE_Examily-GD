@@ -1,14 +1,18 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { AnswersService } from './answers.service';
 import { AnswersController } from './answers.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Answer } from './entities/answer.entity';
 import { Question } from 'src/questions/entities/question.entity';
+import { QuestionsModule } from 'src/questions/questions.module'; // ✅ import module gốc
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Answer, Question])],
+  imports: [
+    TypeOrmModule.forFeature([Answer, Question]),
+    forwardRef(() => QuestionsModule), // ✅ sử dụng forwardRef
+  ],
   controllers: [AnswersController],
   providers: [AnswersService],
-  exports: [AnswersService],
+  exports: [AnswersService], // ✅ export service cho module khác dùng
 })
 export class AnswersModule {}

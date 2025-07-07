@@ -9,23 +9,31 @@ import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 
+// 🔥 Thêm các import để dùng NestExpressApplication và path
+import { NestExpressApplication } from '@nestjs/platform-express';
+import * as path from 'path';
+
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  //middlewares
+  // 👇 Tạo app với NestExpressApplication để dùng useStaticAssets
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // ✅ Serve static files từ thư mục "public" tại route "/api/public"
+  app.useStaticAssets(path.join(__dirname, '..', 'public'), {
+    prefix: '/api/public/',
+  });
+
+  // Global filters & interceptors
   app.useGlobalFilters(new HttpExceptionFilter());
-  // // log time request
   app.useGlobalInterceptors(new LoggingInterceptor());
-  // // customize response
   const reflector = app.get(Reflector);
   app.useGlobalInterceptors(new TransformInterceptor(reflector));
-  // // handle errors
   // app.useGlobalInterceptors(new ErrorsInterceptor());
-  // // handle timeout
-  app.useGlobalInterceptors(new TimeoutInterceptor);
-  // set global route
+  app.useGlobalInterceptors(new TimeoutInterceptor());
+
+  // Global route prefix
   app.setGlobalPrefix('api');
-  // Global ValidationPipe để tự động validate DTO
-  //validation
+
+  // Global ValidationPipe
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -36,13 +44,14 @@ async function bootstrap() {
       },
     }),
   );
+
   // CORS setup
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*', // Cho phép tất cả hoặc chỉ định origin cụ thể
+    origin: process.env.CORS_ORIGIN || '*',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true, // Cho phép cookie và thông tin xác thực khác
+    credentials: true,
   });
-  // Serve config service
+
   const configService = app.get(ConfigService);
 
   // Swagger setup
@@ -54,10 +63,11 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  const port:number = configService.get<number>('PORT') || 3000;
+  const port: number = configService.get<number>('PORT') || 3000;
   await app.listen(port);
-  // log starting message
-  console.log(`Nest application is starting: http://localhost:${port}/api/`);
-  console.log(`Database connected : ${process.env.DB_DATABASE}`);
+
+  console.log(`✅ Server started: http://localhost:${port}/api/`);
+  // console.log(`📁 Static file served at: http://localhost:${port}/api/public/`);
+  console.log(`📦 Database connected: ${process.env.DB_DATABASE}`);
 }
 bootstrap();

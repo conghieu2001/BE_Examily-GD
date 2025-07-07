@@ -28,6 +28,6 @@ export class User extends BaseWithCreatedBy {
     @ManyToMany(() => CourseByExam, courseByExam => courseByExam.students)
     joinedCourseByExams: CourseByExam[];
 
-    @ManyToMany(() => Course, course => course.users)
-    joinedCourses: Course[];
+    // @ManyToMany(() => Course, course => course.users)
+    // joinedCourses: Course[];
 }

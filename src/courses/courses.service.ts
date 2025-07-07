@@ -154,58 +154,58 @@ export class CoursesService {
     return isClass; // Trả về dữ liệu trước khi xóa
   }
 
-  async joinCourse(courseId: number, user: User, dto: JoinCourseDto): Promise<Course> {
-    const course = await this.courseRepo.findOne({
-      where: { id: courseId },
-      relations: ['users'],
-    });
+  // async joinCourse(courseId: number, user: User, dto: JoinCourseDto): Promise<Course> {
+  //   const course = await this.courseRepo.findOne({
+  //     where: { id: courseId },
+  //     relations: ['users'],
+  //   });
 
-    if (!course) {
-      throw new NotFoundException(`Không tìm thấy khóa học với ID: ${courseId}`);
-    }
+  //   if (!course) {
+  //     throw new NotFoundException(`Không tìm thấy khóa học với ID: ${courseId}`);
+  //   }
 
-    //Nếu khóa học bị khóa → kiểm tra mật khẩu
-    if (course.isLocked) {
-      if (!dto.password) {
-        throw new BadRequestException('Khóa học yêu cầu mật khẩu');
-      }
+  //   //Nếu khóa học bị khóa → kiểm tra mật khẩu
+  //   if (course.isLocked) {
+  //     if (!dto.password) {
+  //       throw new BadRequestException('Khóa học yêu cầu mật khẩu');
+  //     }
 
-      const isMatch = await bcrypt.compare(dto.password, course.password);
-      if (!isMatch) {
-        throw new UnauthorizedException('Sai mật khẩu');
-      }
-    }
+  //     const isMatch = await bcrypt.compare(dto.password, course.password);
+  //     if (!isMatch) {
+  //       throw new UnauthorizedException('Sai mật khẩu');
+  //     }
+  //   }
 
-    //Kiểm tra nếu user đã tham gia rồi
-    const alreadyJoined = course.users.some(u => u.id === user.id);
-    if (alreadyJoined) {
-      return course; // hoặc throw new BadRequestException('Đã tham gia khóa học');
-    }
+  //   //Kiểm tra nếu user đã tham gia rồi
+  //   const alreadyJoined = course.users.some(u => u.id === user.id);
+  //   if (alreadyJoined) {
+  //     return course; // hoặc throw new BadRequestException('Đã tham gia khóa học');
+  //   }
 
-    //Thêm user vào danh sách
-    course.users.push(user);
+  //   //Thêm user vào danh sách
+  //   course.users.push(user);
 
-    return await this.courseRepo.save(course);
-  }
+  //   return await this.courseRepo.save(course);
+  // }
 
-  async removeUserFromCourse(courseId: number, userId: number): Promise<Course> {
-    const course = await this.courseRepo.findOne({
-      where: { id: courseId },
-      relations: ['users'],
-    });
+  // async removeUserFromCourse(courseId: number, userId: number): Promise<Course> {
+  //   const course = await this.courseRepo.findOne({
+  //     where: { id: courseId },
+  //     relations: ['users'],
+  //   });
 
-    if (!course) {
-      throw new NotFoundException(`Không tìm thấy khóa học với ID: ${courseId}`);
-    }
+  //   if (!course) {
+  //     throw new NotFoundException(`Không tìm thấy khóa học với ID: ${courseId}`);
+  //   }
 
-    const userIndex = course.users.findIndex(user => user.id === userId);
-    if (userIndex === -1) {
-      throw new NotFoundException(`Người dùng với ID ${userId} chưa tham gia khóa học này`);
-    }
+  //   const userIndex = course.users.findIndex(user => user.id === userId);
+  //   if (userIndex === -1) {
+  //     throw new NotFoundException(`Người dùng với ID ${userId} chưa tham gia khóa học này`);
+  //   }
 
-    // Xoá user khỏi danh sách
-    course.users.splice(userIndex, 1);
+  //   // Xoá user khỏi danh sách
+  //   course.users.splice(userIndex, 1);
 
-    return await this.courseRepo.save(course);
-  }
+  //   return await this.courseRepo.save(course);
+  // }
 }

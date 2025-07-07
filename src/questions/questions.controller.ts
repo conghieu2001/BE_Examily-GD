@@ -20,8 +20,12 @@ import { Level } from 'src/levels/entities/level.entity';
 import { TypeQuestion } from 'src/type-questions/entities/type-question.entity';
 import { MultipeChoice } from 'src/multipe-choice/entities/multipe-choice.entity';
 import { AnswersService } from 'src/answers/answers.service';
+import { RoleGuard } from 'src/roles/role.guard';
+import { Roles } from 'src/roles/role.decorator';
+import { Role } from 'src/roles/role.enum';
 
 @Controller('questions')
+@UseGuards(RoleGuard)
 export class QuestionsController {
   constructor(
     private readonly questionsService: QuestionsService,
@@ -51,7 +55,8 @@ export class QuestionsController {
   ) { }
 
   @Post()
-  @Public()
+  @Post()
+  @Roles(Role.ADMIN && Role.TEACHER)
   create(@Body() createQuestionDto: CreateQuestionDto, @Req() request: Request) {
     const user: User = request['user'] ?? null;
     return this.questionsService.create(createQuestionDto, user);
@@ -181,9 +186,9 @@ export class QuestionsController {
 
   @Patch(':id')
   @Public()
-  update(@Param('id') id: string, @Body() updateQuestionDto: UpdateQuestionDto) {
-    console.log('1')
-    return this.questionsService.update(+id, updateQuestionDto);
+  async update(@Param('id') id: string, @Body() updateQuestionDto: UpdateQuestionDto) {
+    console.log('1', updateQuestionDto.answers)
+    return await this.questionsService.update(+id, updateQuestionDto);
   }
 
   @Delete(':id')

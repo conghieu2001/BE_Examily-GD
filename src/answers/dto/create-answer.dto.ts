@@ -1,4 +1,5 @@
 import { ApiProperty, OmitType } from "@nestjs/swagger";
+import { Transform } from "class-transformer";
 import { IsBoolean, IsNotEmpty, IsNumber } from "class-validator";
 import { BaseDto } from "src/common/dto/base.dto";
 

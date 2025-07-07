@@ -2,6 +2,7 @@ import { ApiProperty, OmitType } from "@nestjs/swagger";
 import { IsArray, IsEnum, IsNotEmpty, IsNumber } from "class-validator";
 import { BaseDto } from "src/common/dto/base.dto";
 import { CreateAnswerDto } from "src/answers/dto/create-answer.dto";
+import { Answer } from "src/answers/entities/answer.entity";
 
 export class CreateQuestionDto extends OmitType(BaseDto, [] as const) {
     @ApiProperty()
@@ -40,7 +41,7 @@ export class CreateQuestionDto extends OmitType(BaseDto, [] as const) {
     @IsNumber()
     typeQuestionId: number;
 
-    @ApiProperty({ type: [CreateAnswerDto] })
+    @ApiProperty()
     @IsArray()
     answers: CreateAnswerDto[];
 }

@@ -30,12 +30,14 @@ export class AnswersController {
   }
 
   @Get(':id')
+  @Public()
   findOne(@Param('id') id: string) {
     return this.answersService.findOne(+id);
   }
 
-  @Put(':id')
-  @Roles(Role.TEACHER)
+  @Patch(':id')
+  // @Roles(Role.TEACHER)
+  @Public()
   update(@Param('id') id: string, @Body() updateAnswerDto: UpdateAnswerDto) {
     return this.answersService.update(+id, updateAnswerDto);
   }

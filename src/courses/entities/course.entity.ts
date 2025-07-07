@@ -20,11 +20,11 @@ export class Course extends BaseWithCreatedBy {
   @OneToMany(() => CourseByExam, courseByExam => courseByExam.course)
   courseByExams: CourseByExam[];
 
-  @ManyToMany(() => User, user => user.joinedCourses, { cascade: true })
-  @JoinTable({
-    name: 'course_students',
-    joinColumn: { name: 'courseId', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'userId', referencedColumnName: 'id' },
-  })
-  users: User[];
+  // @ManyToMany(() => User, user => user.joinedCourses, { cascade: true })
+  // @JoinTable({
+  //   name: 'course_students',
+  //   joinColumn: { name: 'courseId', referencedColumnName: 'id' },
+  //   inverseJoinColumn: { name: 'userId', referencedColumnName: 'id' },
+  // })
+  // users: User[];
 }

@@ -29,25 +29,25 @@ export class CoursesController {
     return this.coursesService.findAll(pageOptionDto, query);
   }
 
-  @Post(':id/join')
-  @Public()
-  async joinCourse(
-    @Param('id') id: number,
-    @Req() request: Request,
-    @Body() dto: JoinCourseDto,
-  ) {
-    const user: User = request['user'] ?? null;
-    return this.coursesService.joinCourse(id, user, dto);
-  }
+  // @Post(':id/join')
+  // @Public()
+  // async joinCourse(
+  //   @Param('id') id: number,
+  //   @Req() request: Request,
+  //   @Body() dto: JoinCourseDto,
+  // ) {
+  //   const user: User = request['user'] ?? null;
+  //   return this.coursesService.joinCourse(id, user, dto);
+  // }
 
-  @Delete(':courseId/remove-user/:userId')
-  @Roles(Role.ADMIN && Role.TEACHER)
-  async removeStudent(
-    @Param('courseId') courseId: number,
-    @Param('userId') userId: number,
-  ) {
-    return this.coursesService.removeUserFromCourse(courseId, userId);
-  }
+  // @Delete(':courseId/remove-user/:userId')
+  // @Roles(Role.ADMIN && Role.TEACHER)
+  // async removeStudent(
+  //   @Param('courseId') courseId: number,
+  //   @Param('userId') userId: number,
+  // ) {
+  //   return this.coursesService.removeUserFromCourse(courseId, userId);
+  // }
 
   @Get(':id')
   @Public()

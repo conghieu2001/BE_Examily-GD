@@ -3,7 +3,7 @@ import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Question } from './entities/question.entity';
-import { DeepPartial, Repository } from 'typeorm';
+import { DeepPartial, Repository, ReturnDocument } from 'typeorm';
 import { User } from 'src/users/entities/user.entity';
 import { Exam } from 'src/exams/entities/exam.entity';
 import { PageMetaDto } from 'src/common/paginations/dtos/page.metadata.dto';
@@ -19,6 +19,7 @@ import { Answer } from 'src/answers/entities/answer.entity';
 import { TypeQuestion } from 'src/type-questions/entities/type-question.entity';
 import { paginationKeyword } from 'src/utils/keywork-pagination';
 import { MultipeChoice } from 'src/multipe-choice/entities/multipe-choice.entity';
+import { after } from 'node:test';
 
 @Injectable()
 export class QuestionsService {
@@ -31,6 +32,7 @@ export class QuestionsService {
     @InjectRepository(Class) private classRepo: Repository<Class>,
     @InjectRepository(TypeQuestion) private typeQuestionRepo: Repository<TypeQuestion>,
     @InjectRepository(MultipeChoice) private multipeChoiceRepo: Repository<MultipeChoice>,
+    @InjectRepository(Answer) private answerRepo: Repository<Answer>,
     @Inject(forwardRef(() => AnswersService))
     private readonly answerService: AnswersService,
   ) { }
@@ -124,7 +126,7 @@ export class QuestionsService {
           queryBuilder.andWhere(`question.${key} = :${key}`, { [key]: query[key] });
         }
       }
-    }
+    } 
 
     // Tìm kiếm theo content
     if (search) {
@@ -143,6 +145,7 @@ export class QuestionsService {
     return new PageDto(items, pageMetaDto);
   }
   async findOne(id: number): Promise<ItemDto<Question>> {
+    // console.log(id)
     const question = await this.questionRepo.findOne({
       where: { id },
       relations: [
@@ -150,7 +153,6 @@ export class QuestionsService {
         'topic',
         'level',
         'class',
-        'answers',
         'typeQuestion',
         'multipleChoice',
         'createdBy',
@@ -161,14 +163,21 @@ export class QuestionsService {
       throw new NotFoundException(`Không tìm thấy Question với ID: ${id}`);
     }
 
+    // Truy vấn answers theo id tăng dần
+    question.answers = await this.answerRepo.find({
+      where: { question: { id } },
+      order: { id: 'ASC' }, // sắp xếp theo id nếu không có field order
+    });
+
     return new ItemDto(question);
   }
   async update(id: number, updateDto: UpdateQuestionDto): Promise<ItemDto<Question>> {
+    // console.log(id, 'efef')
     const question = await this.questionRepo.findOne({
       where: { id },
-      relations: ['createdBy', 'subject', 'topic', 'level', 'class'],
+      relations: ['createdBy', 'subject', 'topic', 'level', 'class', 'answers'],
     });
-
+    // console.log(question.id)
     if (!question) {
       throw new NotFoundException(`Không tìm thấy Question với ID: ${id}`);
     }
@@ -177,33 +186,27 @@ export class QuestionsService {
       content,
       typeQuestionId,
       multipleChoiceId,
-      // examId,
       subjectId,
       topicId,
       levelId,
       classId,
-      // score,
+      answers,
     } = updateDto;
 
     if (content !== undefined) question.content = content;
-    // if (score !== undefined) question.score = score;
-
-    // if (examId !== undefined) {
-    //   const exam = await this.examRepo.findOne({ where: { id: examId } });
-    //   if (!exam) throw new NotFoundException('Exam không tồn tại');
-    //   question.exam = exam;
-    // }
 
     if (subjectId !== undefined) {
       const subject = await this.subjectRepo.findOne({ where: { id: subjectId } });
       if (!subject) throw new NotFoundException('Subject không tồn tại');
       question.subject = subject;
     }
+
     if (multipleChoiceId !== undefined) {
       const multipleChoice = await this.multipeChoiceRepo.findOne({ where: { id: multipleChoiceId } });
-      if (!multipleChoice) throw new NotFoundException('multipleChoice không tồn tại');
+      if (!multipleChoice) throw new NotFoundException('MultipleChoice không tồn tại');
       question.multipleChoice = multipleChoice;
     }
+
     if (topicId !== undefined) {
       const topic = await this.topicRepo.findOne({ where: { id: topicId } });
       if (!topic) throw new NotFoundException('Topic không tồn tại');
@@ -228,9 +231,38 @@ export class QuestionsService {
       question.class = classEntity;
     }
 
+    // ✅ Cập nhật từng answer theo ID
+    if (answers && Array.isArray(answers)) {
+      // console.log(answers)
+      
+      for (let i=0; i<answers.length; i++) {
+        const a = answers[i] as any
+        // console.log({
+        //   content: a.content,
+        //   isCorrect: a.isCorrect
+        // }, 'aaaa')
+        const aaa =await this.answerRepo.update(a.answerId, {
+          content: a.content,
+          isCorrect: a.isCorrect
+        });
+        console.log(aaa, i)
+      }
+    }
+    // if (answers && Array.isArray(answers)) {
+    //   await Promise.all(
+    //     answers.map((a: any) =>
+    //       this.answerService.update(a.answerId, {
+    //         content: a.content,
+    //         isCorrect: a.isCorrect,
+    //       }),
+    //     ),
+    //   );
+    // }
     const updated = await this.questionRepo.save(question);
+    // console.log(question, 'ques')
     return new ItemDto(updated);
   }
+
   async remove(id: number): Promise<ItemDto<Question>> {
     const checkQuestion = await this.questionRepo.findOne({
       where: { id },
