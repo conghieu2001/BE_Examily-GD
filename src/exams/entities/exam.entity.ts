@@ -10,6 +10,10 @@ import {
 import { BaseWithCreatedBy } from 'src/common/entities/base-user-createdBy';
 import { Course } from 'src/courses/entities/course.entity';
 import { Question } from 'src/questions/entities/question.entity';
+import { Subject } from 'src/subjects/entities/subject.entity';
+import { Class } from 'src/classes/entities/class.entity';
+import { QuestionScore } from 'src/question-score/entities/question-score.entity';
+import { QuestionClone } from 'src/question-clone/entities/question-clone.entity';
 
 @Entity()
 export class Exam extends BaseWithCreatedBy {
@@ -33,11 +37,23 @@ export class Exam extends BaseWithCreatedBy {
   @Column()
   totalEssayScore: number;
 
-  // @ManyToOne(() => Course, course => course.exams, { nullable: false, onDelete: 'CASCADE' })
-  // @JoinColumn({ name: 'course_id' })
-  // course: Course;
-
   @ManyToMany(() => Question, question => question.exams)
   @JoinTable()
   questions: Question[];
+
+  @ManyToMany(() => QuestionClone, question => question.exams)
+  @JoinTable()
+  questionclones: QuestionClone[];
+
+  @ManyToOne(() => Subject, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'subjectId' })
+  subject: Subject;
+
+  @ManyToOne(() => Class, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'classId' })
+  class: Class;
+
+  @OneToMany(() => QuestionScore, qs => qs.exam, { cascade: true })
+  // @JoinColumn({ name: 'questionScoreId' })
+  questionScores: QuestionScore[];
 }

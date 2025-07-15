@@ -21,7 +21,7 @@ export class CourseByExamsService {
     @InjectRepository(Course) private courseRepo: Repository<Course>,
   ) { }
   async create(createCourseByExamDto: CreateCourseByExamDto, user: User): Promise<CourseByExam> {
-    const { examId, courseId, isLocked, password, availableFrom, availableTo } = createCourseByExamDto
+    const { examId, courseId, isLocked, password, availableFrom, availableTo, title } = createCourseByExamDto
     const exam = await this.examRepo.findOne({ where: { id: examId } });
     if (!exam) {
       throw new NotFoundException(`Không tìm thấy đề thi gốc với ID: ${examId}`);
@@ -51,6 +51,7 @@ export class CourseByExamsService {
     }
 
     const newEntry = this.coursebyexamRepo.create({
+      title,
       exam,
       course,
       isLocked,
@@ -58,7 +59,8 @@ export class CourseByExamsService {
       status: computedStatus,
       availableFrom: availableFrom ? new Date(availableFrom) : undefined,
       availableTo: availableTo ? new Date(availableTo) : undefined,
-      createdBy: user?.isAdmin ? user : null,
+      createdBy: user,
+      isPublic: true
     });
 
     return await this.coursebyexamRepo.save(newEntry);

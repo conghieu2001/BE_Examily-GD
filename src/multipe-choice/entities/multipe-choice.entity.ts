@@ -1,4 +1,5 @@
 import { BaseWithCreatedBy } from "src/common/entities/base-user-createdBy";
+import { QuestionClone } from "src/question-clone/entities/question-clone.entity";
 import { Question } from "src/questions/entities/question.entity";
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany, OneToOne } from "typeorm";
 
@@ -22,4 +23,7 @@ export class MultipeChoice extends BaseWithCreatedBy {
 
     @OneToMany(() => Question, question => question.multipleChoice)
     questions: Question[];
+
+    @OneToMany(() => QuestionClone, questionclone => questionclone.multipleChoice)
+    questionclones: QuestionClone[];
 }

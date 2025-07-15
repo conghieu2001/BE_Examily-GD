@@ -1,5 +1,5 @@
 import { ApiProperty, OmitType } from "@nestjs/swagger";
-import { IsArray, IsEnum, IsNotEmpty, IsNumber } from "class-validator";
+import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional } from "class-validator";
 import { BaseDto } from "src/common/dto/base.dto";
 import { CreateAnswerDto } from "src/answers/dto/create-answer.dto";
 import { Answer } from "src/answers/entities/answer.entity";
@@ -9,39 +9,37 @@ export class CreateQuestionDto extends OmitType(BaseDto, [] as const) {
     @IsNotEmpty()
     content: string;
 
-    // @ApiProperty()
-    // @IsNumber()
-    // examId: number;
-
-    @ApiProperty()
+    @ApiProperty({ required: false })
+    @IsOptional()
     @IsNumber()
     subjectId: number;
 
-    @ApiProperty()
+    @ApiProperty({ required: false })
+    @IsOptional()
     @IsNumber()
     classId: number;
 
-    @ApiProperty()
+    @ApiProperty({ required: false })
+    @IsOptional()
     @IsNumber()
     topicId: number;
 
-    @ApiProperty()
+    @ApiProperty({ required: false })
+    @IsOptional()
     @IsNumber()
     multipleChoiceId: number;
 
-    @ApiProperty()
+    @ApiProperty({ required: false })
+    @IsOptional()
     @IsNumber()
     levelId: number;
-
-    // @ApiProperty()
-    // @IsNumber()
-    // score: number;
 
     @ApiProperty()
     @IsNumber()
     typeQuestionId: number;
 
-    @ApiProperty()
+    @ApiProperty({ required: false })
+    @IsOptional()
     @IsArray()
     answers: CreateAnswerDto[];
 }

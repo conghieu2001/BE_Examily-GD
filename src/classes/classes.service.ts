@@ -50,7 +50,7 @@ export class ClassesService {
       });
     }
 
-    queryBuilder.orderBy('class.id', order).skip(skip).take(take);
+    queryBuilder.orderBy('class.id', order).skip(skip);
 
     const itemCount = await queryBuilder.getCount();
     const items = await queryBuilder.getMany();

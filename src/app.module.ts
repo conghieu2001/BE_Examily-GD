@@ -23,6 +23,11 @@ import { LevelsModule } from './levels/levels.module';
 import { MultipeChoiceModule } from './multipe-choice/multipe-choice.module';
 import { TypeQuestionsModule } from './type-questions/type-questions.module';
 import { CourseByExamsModule } from './course-by-exams/course-by-exams.module';
+import { ExamSessionModule } from './exam-session/exam-session.module';
+import { QuestionScoreModule } from './question-score/question-score.module';
+import { SubmitAnswerModule } from './submit-answer/submit-answer.module';
+import { QuestionCloneModule } from './question-clone/question-clone.module';
+import { AnswerCloneModule } from './answer-clone/answer-clone.module';
 
 @Module({
   imports: [
@@ -64,7 +69,7 @@ import { CourseByExamsModule } from './course-by-exams/course-by-exams.module';
     MultipeChoiceModule,
     SubjectsModule,
     TopicsModule, 
-    AnswersModule, TypeQuestionsModule, CourseByExamsModule,
+    AnswersModule, TypeQuestionsModule, CourseByExamsModule, ExamSessionModule, QuestionScoreModule, SubmitAnswerModule, QuestionCloneModule, AnswerCloneModule,
   ],
   controllers: [],
   providers: [

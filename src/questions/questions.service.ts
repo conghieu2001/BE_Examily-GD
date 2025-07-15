@@ -1,9 +1,9 @@
-import { BadRequestException, forwardRef, Inject, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, forwardRef, Inject, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Question } from './entities/question.entity';
-import { DeepPartial, Repository, ReturnDocument } from 'typeorm';
+import { Brackets, DeepPartial, Repository, ReturnDocument } from 'typeorm';
 import { User } from 'src/users/entities/user.entity';
 import { Exam } from 'src/exams/entities/exam.entity';
 import { PageMetaDto } from 'src/common/paginations/dtos/page.metadata.dto';
@@ -43,58 +43,69 @@ export class QuestionsService {
         answers,
         typeQuestionId,
         multipleChoiceId,
-        // examId,
         subjectId,
         topicId,
         levelId,
         classId,
-        // score,
       } = createQuestionDto;
 
       // Tìm các entity liên quan
-      // const exam = await this.examRepo.findOne({ where: { id: examId } });
-      // if (!exam) throw new NotFoundException('Exam không tồn tại');
-      const subject = await this.subjectRepo.findOne({ where: { id: subjectId } });
-      const topic = await this.topicRepo.findOne({ where: { id: topicId } });
-      const level = await this.levelRepo.findOne({ where: { id: levelId } });
-      const checkclass = await this.classRepo.findOne({ where: { id: classId } });
       const typeQuestion = await this.typeQuestionRepo.findOne({ where: { id: typeQuestionId } });
-      const mc = await this.multipeChoiceRepo.findOne({ where: { id: multipleChoiceId } });
 
-      // Kiểm tra trùng nội dung trong đề thi
-      // const existing = await this.questionRepo.findOne({
-      //   where: { content, exam: { id: examId } },
-      //   relations: ['exam'],
-      // });
-      // if (existing) throw new BadRequestException('Câu hỏi đã tồn tại trong đề thi này');
-      if (!subject || !topic || !level || !checkclass || !typeQuestion || !mc) {
-        throw new BadRequestException('Subject, Topic, Level, Class, TypeQuestion, Multiple choice không tồn tại');
+      if (!typeQuestion) {
+        throw new BadRequestException('TypeQuestion không tồn tại');
       }
-      // Tạo câu hỏi
-      const newQuestion = this.questionRepo.create({
-        content,
-        typeQuestion,
-        multipleChoice: mc,
-        // exam,
-        subject,
-        topic,
-        level,
-        class: checkclass,
-        // score: Number(score),
-        createdBy: user,
-      } as DeepPartial<Question>);
-      const question = await this.questionRepo.save(newQuestion);
-      // console.log(question)
-      // Xử lý danh sách câu trả lời
-      const validAnswers = answers.filter(a => a.content?.trim());
-      for (const answer of validAnswers) {
-        await this.answerService.create({
-          content: answer.content,
-          isCorrect: answer.isCorrect,
-          questionId: question.id,
-        }, user);
+
+      if (typeQuestion.name === 'multiple_choice') {
+        const level = await this.levelRepo.findOne({ where: { id: levelId } });
+        const subject = await this.subjectRepo.findOne({ where: { id: subjectId } });
+        const topic = await this.topicRepo.findOne({ where: { id: topicId } });
+        const checkclass = await this.classRepo.findOne({ where: { id: classId } });
+        const mc = await this.multipeChoiceRepo.findOne({ where: { id: multipleChoiceId } });
+
+        if (!level || !subject || !topic || !checkclass || !mc) {
+          throw new BadRequestException('Level, Subject, Topic, Level, TypeQuestion không tồn tại');
+        }
+        // Tạo câu hỏi
+        const newQuestion = this.questionRepo.create({
+          content,
+          typeQuestion,
+          multipleChoice: mc,
+          subject,
+          topic,
+          level,
+          class: checkclass,
+          createdBy: user,
+        } as DeepPartial<Question>);
+        const question = await this.questionRepo.save(newQuestion);
+        // Xử lý danh sách câu trả lời
+        const validAnswers = answers.filter(a => a.content?.trim());
+        for (const answer of validAnswers) {
+          await this.answerService.create({
+            content: answer.content,
+            isCorrect: answer.isCorrect,
+            questionId: question.id,
+          }, user);
+        }
+        return question;
+      } else {
+        // Tạo câu hỏi
+        const newQuestion = this.questionRepo.create({
+          content,
+          typeQuestion,
+          multipleChoice: undefined,
+          subject: undefined,
+          topic: undefined,
+          level: undefined,
+          class: undefined,
+          answers: undefined,
+          createdBy: user,
+        });
+        const question = await this.questionRepo.save(newQuestion);
+        return question;
       }
-      return question;
+
+
     } catch (error) {
       console.error(error);
       throw new InternalServerErrorException('Tạo câu hỏi thất bại');
@@ -103,7 +114,8 @@ export class QuestionsService {
   }
   async findAll(
     pageOptions: PageOptionsDto,
-    query: Partial<Question>,
+    query: Partial<Question> & { createdById?: number },
+    user: User,
   ): Promise<PageDto<Question>> {
     const queryBuilder = this.questionRepo
       .createQueryBuilder('question')
@@ -117,18 +129,38 @@ export class QuestionsService {
       .leftJoinAndSelect('question.createdBy', 'createdBy');
 
     const { skip, take, order = 'ASC', search } = pageOptions;
-    const pagination: string[] = paginationKeyword;
+    const paginationKeys = paginationKeyword;
 
-    // Lọc theo các trường truyền vào query (vd: subjectId, levelId, type, etc.)
+    // 🔍 Điều kiện quyền truy cập
+    queryBuilder.andWhere(
+      new Brackets(qb => {
+        qb.where('createdBy.id = :userId', { userId: user.id })
+          .orWhere(new Brackets(qb2 => {
+            qb2.where('question.isPublic = true')
+              .andWhere('class.id IN (:...classIds)', { classIds: user.classes?.map(c => c.id) || [-1] })
+              .andWhere('subject.id IN (:...subjectIds)', { subjectIds: user.subjects?.map(s => s.id) || [-1] });
+          }));
+      })
+    );
+
+    // 🔍 Lọc theo các điều kiện cụ thể
     if (query && Object.keys(query).length > 0) {
       for (const key of Object.keys(query)) {
-        if (!pagination.includes(key) && query[key] !== undefined) {
-          queryBuilder.andWhere(`question.${key} = :${key}`, { [key]: query[key] });
+        if (!paginationKeys.includes(key) && query[key] !== undefined) {
+          if (key === 'typeQuestionId') {
+            queryBuilder.andWhere('typeQuestion.id = :typeQuestionId', {
+              typeQuestionId: query[key],
+            });
+          } else {
+            queryBuilder.andWhere(`question.${key} = :${key}`, {
+              [key]: query[key],
+            });
+          }
         }
       }
-    } 
+    }
 
-    // Tìm kiếm theo content
+    // 🔍 Tìm kiếm theo content
     if (search) {
       queryBuilder.andWhere(
         `LOWER(unaccent(question.content)) ILIKE LOWER(unaccent(:search))`,
@@ -136,12 +168,24 @@ export class QuestionsService {
       );
     }
 
-    queryBuilder.orderBy('question.id', order).skip(skip).take(take);
+    // 🧾 Sắp xếp và phân trang
+    const hasTake = 'take' in query && !isNaN(parseInt(query.take as string));
+    queryBuilder.orderBy('question.id', order);
+    if (hasTake) {
+      queryBuilder.skip(skip).take(parseInt(query.take as string));
+    }
 
     const itemCount = await queryBuilder.getCount();
     const items = await queryBuilder.getMany();
-    const pageMetaDto = new PageMetaDto({ pageOptionsDto: pageOptions, itemCount });
 
+    // ✅ Sắp xếp câu trả lời theo id tăng dần
+    for (const question of items) {
+      if (Array.isArray(question.answers)) {
+        question.answers.sort((a, b) => a.id - b.id);
+      }
+    }
+
+    const pageMetaDto = new PageMetaDto({ pageOptionsDto: pageOptions, itemCount });
     return new PageDto(items, pageMetaDto);
   }
   async findOne(id: number): Promise<ItemDto<Question>> {
@@ -166,22 +210,24 @@ export class QuestionsService {
     // Truy vấn answers theo id tăng dần
     question.answers = await this.answerRepo.find({
       where: { question: { id } },
-      order: { id: 'ASC' }, // sắp xếp theo id nếu không có field order
+      order: { id: 'ASC' },
     });
 
     return new ItemDto(question);
   }
-  async update(id: number, updateDto: UpdateQuestionDto): Promise<ItemDto<Question>> {
-    // console.log(id, 'efef')
+  async update(id: number, updateDto: UpdateQuestionDto, user: User) {
+    // console.log(id, user)
     const question = await this.questionRepo.findOne({
       where: { id },
       relations: ['createdBy', 'subject', 'topic', 'level', 'class', 'answers'],
     });
-    // console.log(question.id)
+    // console.log(question)
     if (!question) {
       throw new NotFoundException(`Không tìm thấy Question với ID: ${id}`);
     }
-
+    if (!(user && (user.isAdmin === true || question.createdBy?.id === user.id))) {
+      throw new ForbiddenException('Bạn không có quyền cập nhật câu hỏi này');
+    }
     const {
       content,
       typeQuestionId,
@@ -230,40 +276,25 @@ export class QuestionsService {
       if (!classEntity) throw new NotFoundException('Class không tồn tại');
       question.class = classEntity;
     }
-
     // ✅ Cập nhật từng answer theo ID
     if (answers && Array.isArray(answers)) {
       // console.log(answers)
-      
-      for (let i=0; i<answers.length; i++) {
+      question.answers.sort((a, b) => a.id - b.id);
+      for (let i = 0; i < answers.length; i++) {
         const a = answers[i] as any
-        // console.log({
-        //   content: a.content,
-        //   isCorrect: a.isCorrect
-        // }, 'aaaa')
-        const aaa =await this.answerRepo.update(a.answerId, {
+        const answer = question.answers[i]
+        // console.log(a, answer)
+        const updated = this.answerRepo.merge(answer, {
           content: a.content,
-          isCorrect: a.isCorrect
+          isCorrect: a.isCorrect,
         });
-        console.log(aaa, i)
+        await this.answerRepo.update(answer.id, updated);
       }
     }
-    // if (answers && Array.isArray(answers)) {
-    //   await Promise.all(
-    //     answers.map((a: any) =>
-    //       this.answerService.update(a.answerId, {
-    //         content: a.content,
-    //         isCorrect: a.isCorrect,
-    //       }),
-    //     ),
-    //   );
-    // }
     const updated = await this.questionRepo.save(question);
-    // console.log(question, 'ques')
     return new ItemDto(updated);
   }
-
-  async remove(id: number): Promise<ItemDto<Question>> {
+  async remove(id: number, user: User): Promise<ItemDto<Question>> {
     const checkQuestion = await this.questionRepo.findOne({
       where: { id },
       relations: ['createdBy'],
@@ -272,8 +303,10 @@ export class QuestionsService {
     if (!checkQuestion) {
       throw new NotFoundException(`Không tìm thấy Question với ID: ${id}`);
     }
-
-    await this.questionRepo.softRemove(checkQuestion);
+    if (!(user && (user.role === 'admin' || checkQuestion.createdBy?.id === user.id))) {
+      throw new ForbiddenException('Bạn không có quyền xóa câu hỏi này');
+    }
+    await this.questionRepo.remove(checkQuestion);
     return new ItemDto(checkQuestion);
   }
   async findByType(typeCode: number): Promise<Question[]> {
@@ -289,5 +322,77 @@ export class QuestionsService {
       where: { multipleChoice: { id: type.id } },
       relations: ['answers', 'subject', 'topic', 'level', 'class', 'multipleChoice', 'typeQuestion'],
     });
+  }
+  async cloneQuestion(questionId: number, user: User): Promise<Question> {
+    try {
+      // 1. Tìm câu hỏi gốc và các liên kết
+      const originalQuestion = await this.questionRepo.findOne({
+        where: { id: questionId },
+        relations: [
+          'answers',
+          'typeQuestion',
+          'multipleChoice',
+          'subject',
+          'topic',
+          'level',
+          'class',
+        ],
+      });
+
+      if (!originalQuestion) {
+        throw new NotFoundException('Không tìm thấy câu hỏi để nhân bản');
+      }
+
+      // 2. Clone câu hỏi
+      const clonedQuestion = this.questionRepo.create({
+        content: originalQuestion.content,
+        typeQuestion: originalQuestion.typeQuestion,
+        multipleChoice: originalQuestion.multipleChoice,
+        subject: originalQuestion.subject,
+        topic: originalQuestion.topic,
+        level: originalQuestion.level,
+        class: originalQuestion.class,
+        createdBy: user,
+      });
+
+      const savedClonedQuestion = await this.questionRepo.save(clonedQuestion);
+
+      // 3. Clone các câu trả lời (nếu có)
+      if (originalQuestion.answers && originalQuestion.answers.length > 0) {
+        for (const answer of originalQuestion.answers) {
+          await this.answerService.create({
+            content: answer.content,
+            isCorrect: answer.isCorrect,
+            questionId: savedClonedQuestion.id,
+          }, user);
+        }
+      }
+
+      return savedClonedQuestion;
+    } catch (error) {
+      console.error(error);
+      throw new InternalServerErrorException('Clone câu hỏi thất bại');
+    }
+  }
+  async updateIsPublicToggle(id: number, user: User): Promise<ItemDto<Question>> {
+    const question = await this.questionRepo.findOne({
+      where: { id },
+      relations: ['createdBy'],
+    });
+
+    if (!question) {
+      throw new NotFoundException(`Không tìm thấy Question với ID: ${id}`);
+    }
+
+    // Chỉ admin hoặc người tạo câu hỏi mới được phép cập nhật
+    if (!(user && (user.isAdmin || question.createdBy?.id === user.id))) {
+      throw new ForbiddenException('Bạn không có quyền thay đổi trạng thái công khai của câu hỏi này');
+    }
+
+    // Đảo ngược trạng thái isPublic
+    question.isPublic = !question.isPublic;
+
+    const updated = await this.questionRepo.save(question);
+    return new ItemDto(updated);
   }
 }

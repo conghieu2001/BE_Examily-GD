@@ -4,6 +4,7 @@ import { BaseWithCreatedBy } from "src/common/entities/base-user-createdBy";
 import { Exam } from "src/exams/entities/exam.entity";
 import { Level } from "src/levels/entities/level.entity";
 import { MultipeChoice } from "src/multipe-choice/entities/multipe-choice.entity";
+import { QuestionScore } from "src/question-score/entities/question-score.entity";
 import { Subject } from "src/subjects/entities/subject.entity";
 import { Topic } from "src/topics/entities/topic.entity";
 import { TypeQuestion } from "src/type-questions/entities/type-question.entity";
@@ -25,8 +26,7 @@ export class Question extends BaseWithCreatedBy {
     @ManyToOne(() => Level, { nullable: true })
     @JoinColumn({ name: "levelId" })
     level: Level;
-    // @Column("decimal", { precision: 5, scale: 2, nullable: true })
-    // score: number;
+
     @ManyToOne(() => Class, { nullable: true })
     @JoinColumn({ name: 'classId' })
     class: Class;
@@ -40,4 +40,7 @@ export class Question extends BaseWithCreatedBy {
     @ManyToOne(() => MultipeChoice, mc => mc.questions, { nullable: true })
     @JoinColumn({ name: 'multipleChoiceId' })
     multipleChoice: MultipeChoice;
+
+    @OneToMany(() => QuestionScore, qs => qs.question)
+    questionScores: QuestionScore[];
 }

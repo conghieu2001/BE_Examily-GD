@@ -1,5 +1,5 @@
 import { ApiProperty, OmitType } from "@nestjs/swagger";
-import { IsEmail, IsOptional, IsString } from "class-validator";
+import { IsArray, IsEmail, IsInt, IsOptional, IsString } from "class-validator";
 import { BaseDto } from "src/common/dto/base.dto";
 
 export class CreateUserDto extends OmitType(BaseDto, [] as const) {
@@ -22,5 +22,17 @@ export class CreateUserDto extends OmitType(BaseDto, [] as const) {
     role: string;
 
     avatar?: string;
+
+    @ApiProperty({ type: [Number], required: false })
+    @IsOptional()
+    @IsArray()
+    @IsInt({ each: true })
+    classIds?: number[];
+
+    @ApiProperty({ type: [Number], required: false })
+    @IsOptional()
+    @IsArray()
+    @IsInt({ each: true })
+    subjectIds?: number[];
 
 }

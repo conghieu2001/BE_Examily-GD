@@ -10,6 +10,7 @@ import { ItemDto, PageDto } from 'src/common/paginations/dtos/page.dto';
 import { PageMetaDto } from 'src/common/paginations/dtos/page.metadata.dto';
 import * as bcrypt from 'bcrypt';
 import { JoinCourseDto } from './dto/join-course.dto';
+import { Role } from 'src/roles/role.enum';
 
 @Injectable()
 export class CoursesService {
@@ -42,7 +43,7 @@ export class CoursesService {
       description,
       isLocked,
       password: hashedPassword, // chỉ là string hoặc undefined
-      createdBy: user?.isAdmin ? user : null,
+      createdBy: user,
     });
 
     return await this.courseRepo.save(newCourse);
@@ -82,7 +83,8 @@ export class CoursesService {
     return new PageDto(items, pageMetaDto);
   }
 
-  async findOne(id: number, password?: string): Promise<ItemDto<Course>> {
+  async findOne(id: number, user: User): Promise<ItemDto<Course>> {
+    console.log(user)
     const course = await this.courseRepo.findOne({
       where: { id },
       relations: ['createdBy', 'courseByExams'],
@@ -92,17 +94,35 @@ export class CoursesService {
       throw new NotFoundException(`Không tìm thấy khóa học với ID: ${id}`);
     }
 
-    if (course.isLocked) {
-      if (!password) {
-        throw new BadRequestException('Khóa học này bị khóa, vui lòng cung cấp mật khẩu');
-      }
+    // if (course.isLocked) {
+    //   if (!password) {
+    //     throw new BadRequestException('Khóa học này bị khóa, vui lòng cung cấp mật khẩu');
+    //   }
 
-      const isMatch = await bcrypt.compare(password, course.password);
-      if (!isMatch) {
-        throw new BadRequestException('Mật khẩu không đúng');
+    //   const isMatch = await bcrypt.compare(password, course.password);
+    //   if (!isMatch) {
+    //     throw new BadRequestException('Mật khẩu không đúng');
+    //   }
+    // }
+    if (user?.role === Role.STUDENT) {
+      // Học sinh chỉ xem được các bài thi không khóa
+      course.courseByExams = course.courseByExams.filter(cb => !cb.isLocked);
+
+    } else if (user?.role === Role.TEACHER) {
+      const isOwner = course.createdBy?.id === user.id;
+      if (!isOwner) {
+        // Giáo viên không phải người tạo => chỉ xem bài không khóa
+        course.courseByExams = course.courseByExams.filter(cb => !cb.isLocked);
       }
+      // Nếu là người tạo thì giữ nguyên tất cả
+
+    } else if (user?.role === Role.ADMIN) {
+      // Admin được xem tất cả => giữ nguyên courseByExams
+
+    } else {
+      // Không xác định quyền => không được xem gì
+      course.courseByExams = [];
     }
-
     return new ItemDto(course);
   }
 

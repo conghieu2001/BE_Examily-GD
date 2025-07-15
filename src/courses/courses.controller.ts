@@ -50,9 +50,10 @@ export class CoursesController {
   // }
 
   @Get(':id')
-  @Public()
-  findOne(@Param('id') id: string) {
-    return this.coursesService.findOne(+id);
+  @Roles(Role.ADMIN && Role.TEACHER)
+  findOne(@Param('id') id: string, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.coursesService.findOne(+id, user);
   }
 
   @Patch(':id')

@@ -1,10 +1,10 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { CreateAnswerDto } from './create-answer.dto';
-import { IsNumber } from 'class-validator';
+import { IsInt, IsNumber } from 'class-validator';
 
 export class UpdateAnswerDto extends PartialType(CreateAnswerDto) {
-//     @ApiProperty()
-//     @IsNumber()
-//     answerId: number;
+    // @ApiProperty()
+    // @IsNumber()
+    // answerId: number;
 // }
 }

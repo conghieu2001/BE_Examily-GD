@@ -19,6 +19,7 @@ export class ExamsController {
   @Roles(Role.ADMIN && Role.TEACHER)
   create(@Body() createExamDto: CreateExamDto, @Req() request: Request) {
     const user: User = request['user'] ?? null;
+    // console.log(user)
     return this.examsService.create(createExamDto, user);
   }
 
@@ -45,9 +46,10 @@ export class ExamsController {
   }
 
   @Patch(':id')
-  @Public()
-  update(@Param('id') id: string, @Body() updateExamDto: UpdateExamDto) {
-    return this.examsService.update(+id, updateExamDto);
+  @Roles(Role.ADMIN && Role.TEACHER)
+  update(@Param('id') id: string, @Body() updateExamDto: UpdateExamDto, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.examsService.update(+id, updateExamDto, user);
   }
 
   @Delete(':id')
