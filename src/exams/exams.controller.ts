@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Req, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req, Query, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { ExamsService } from './exams.service';
 import { CreateExamDto } from './dto/create-exam.dto';
 import { UpdateExamDto } from './dto/update-exam.dto';
@@ -19,14 +19,14 @@ export class ExamsController {
   @Roles(Role.ADMIN && Role.TEACHER)
   create(@Body() createExamDto: CreateExamDto, @Req() request: Request) {
     const user: User = request['user'] ?? null;
-    // console.log(user)
     return this.examsService.create(createExamDto, user);
   }
 
   @Get()
-  @Public()
-  findAll(@Query() pageOptionDto: PageOptionsDto, @Query() query: Partial<Exam>) {
-    return this.examsService.findAll(pageOptionDto, query);
+  @Roles(Role.ADMIN && Role.TEACHER)
+  findAll(@Query() pageOptionDto: PageOptionsDto, @Query() query: Partial<Exam>, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.examsService.findAll(pageOptionDto, query, user);
   }
 
   @Get(':id')
@@ -34,7 +34,15 @@ export class ExamsController {
   findOne(@Param('id') id: string) {
     return this.examsService.findOne(+id);
   }
-
+  @Patch('toggle-public/:id')
+  @Roles(Role.ADMIN && Role.TEACHER)
+  async toggleIsPublic(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: Request
+  ) {
+    const user: User = request['user'] ?? null;
+    return this.examsService.toggleIsPublic(id, user);
+  }
   @Post('clone/:id')
   @Roles(Role.ADMIN && Role.TEACHER)
   async cloneExam(
@@ -47,9 +55,16 @@ export class ExamsController {
 
   @Patch(':id')
   @Roles(Role.ADMIN && Role.TEACHER)
-  update(@Param('id') id: string, @Body() updateExamDto: UpdateExamDto, @Req() request: Request) {
+  // @Public()
+  update(
+    @Param('id') id: string,
+    @Body() rawBody: any, // KHÔNG dùng DTO ở đây
+    @Req() request: Request
+  ) {
     const user: User = request['user'] ?? null;
-    return this.examsService.update(+id, updateExamDto, user);
+    const rawQuestionClones = rawBody.questionClones ?? [];
+    // console.log(rawQuestionClones)
+    return this.examsService.update(+id, rawBody, user, rawQuestionClones);
   }
 
   @Delete(':id')

@@ -172,7 +172,7 @@ export class QuestionsController {
   }
 
   @Get()
-  @Public()
+  @Roles(Role.ADMIN, Role.TEACHER, Role.STUDENT)
   findAll(@Query() pageOptionDto: PageOptionsDto, @Query() query: Partial<Question>, @Req() request: Request) {
     const user: User = request['user'] ?? null;
     return this.questionsService.findAll(pageOptionDto, query, user);
@@ -185,6 +185,7 @@ export class QuestionsController {
   }
 
   @Patch('toggle-public/:id')
+  @Roles(Role.ADMIN && Role.TEACHER)
   async togglePublic(
     @Param('id', ParseIntPipe) id: number, @Req() request: Request) {
     const user: User = request['user'] ?? null;

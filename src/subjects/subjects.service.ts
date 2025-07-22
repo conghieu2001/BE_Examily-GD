@@ -48,29 +48,41 @@ export class SubjectsService {
     rawQuery: Record<string, any>,
   ): Promise<PageDto<Subject>> {
     const queryBuilder = this.subjectRepo.createQueryBuilder('subject')
-      .leftJoinAndSelect('subject.class', 'class')
+      .leftJoinAndSelect('subject.class', 'class');
 
     const { page, take, skip, order, search } = pageOptions;
     const paginationParams = ['page', 'take', 'skip', 'order', 'search'];
 
-    // Filter theo query (loại bỏ các param phân trang)
+    // Lọc theo query (bỏ các param phân trang)
     Object.keys(rawQuery).forEach(key => {
       if (!paginationParams.includes(key) && rawQuery[key] !== undefined) {
-        queryBuilder.andWhere(`subject.${key} = :${key}`, { [key]: rawQuery[key] });
+        if (key === 'classId') {
+          // Nếu là mảng classId
+          const classIds = String(rawQuery[key])
+            .split(',')
+            .map((id: string) => parseInt(id.trim()))
+            .filter((id: number) => !isNaN(id));
+
+          if (classIds.length > 0) {
+            queryBuilder.andWhere('class.id IN (:...classIds)', { classIds });
+          }
+        } else {
+          queryBuilder.andWhere(`subject.${key} = :${key}`, { [key]: rawQuery[key] });
+        }
       }
     });
 
-    // Search theo tên môn học
+    // 🔍 Tìm kiếm theo tên môn học
     if (search) {
       queryBuilder.andWhere(
         `LOWER(unaccent(subject.name)) ILIKE LOWER(unaccent(:search))`,
-        { search: `%${search}%` }
+        { search: `%${search}%` },
       );
     }
 
-    // Nếu không truyền take thì bỏ phân trang (get all)
-    const hastake = Object.prototype.hasOwnProperty.call(rawQuery, 'take');
-    if (hastake) {
+    // 🧾 Nếu có take thì áp dụng phân trang
+    const hasTake = Object.prototype.hasOwnProperty.call(rawQuery, 'take');
+    if (hasTake) {
       queryBuilder.skip(skip).take(take);
     }
 
@@ -79,7 +91,6 @@ export class SubjectsService {
 
     return new PageDto(entities, new PageMetaDto({ pageOptionsDto: pageOptions, itemCount }));
   }
-
   async findOne(id: number) {
     const subject = await this.subjectRepo.findOne({
       where: { id },

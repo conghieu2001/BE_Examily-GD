@@ -20,9 +20,20 @@ export class CreateQuestionCloneDto extends OmitType(BaseDto, [] as const) {
     @ApiProperty({ required: false })
     @IsOptional()
     @IsNumber()
-    multipleChoiceId: number;
+    multipleChoiceId?: number;
 
-    @ApiProperty()
+    @ApiProperty({ required: false })
     @IsNumber()
+    @IsOptional()
     score: number;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsNumber()
+    topicId?: number;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsNumber()
+    levelId?: number;
 }

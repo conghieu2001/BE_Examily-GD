@@ -7,13 +7,16 @@ import { TypeQuestion } from 'src/type-questions/entities/type-question.entity';
 import { AnswerClone } from 'src/answer-clone/entities/answer-clone.entity';
 import { MultipeChoice } from 'src/multipe-choice/entities/multipe-choice.entity';
 import { AnswerCloneModule } from 'src/answer-clone/answer-clone.module';
+import { Topic } from 'src/topics/entities/topic.entity';
+import { Level } from 'src/levels/entities/level.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([QuestionClone, TypeQuestion, AnswerClone, MultipeChoice]),
+    TypeOrmModule.forFeature([QuestionClone, TypeQuestion, AnswerClone, MultipeChoice, Topic, Level]),
     forwardRef(() => AnswerCloneModule),
   ],
   controllers: [QuestionCloneController],
   providers: [QuestionCloneService],
+  exports: [QuestionCloneService],
 })
 export class QuestionCloneModule { }

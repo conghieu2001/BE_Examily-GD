@@ -10,6 +10,7 @@ import {
   ValidateNested,
 } from "class-validator";
 import { BaseDto } from "src/common/dto/base.dto";
+import { CreateQuestionCloneDto } from "src/question-clone/dto/create-question-clone.dto";
 
 export class example {
   @ApiProperty({ required: false })
@@ -62,11 +63,17 @@ export class CreateExamDto extends OmitType(BaseDto, [] as const) {
   @IsNumber()
   totalEssayScore: number;
 
-  @ApiProperty({ type: [Number], required: false })
+  // @ApiProperty({ type: [Number], required: false })
+  // @IsOptional()
+  // @IsArray()
+  // @IsInt({ each: true })
+  // questionIds?: number[];
+  @ApiProperty({ type: [CreateQuestionCloneDto], required: false })
   @IsOptional()
   @IsArray()
-  @IsInt({ each: true })
-  questionIds?: number[];
+  @ValidateNested({ each: true })
+  @Type(() => CreateQuestionCloneDto)
+  questionClones?: CreateQuestionCloneDto[];
 
   @ApiProperty({ required: false })
   @IsOptional()

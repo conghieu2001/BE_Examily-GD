@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateExamDto } from './dto/create-exam.dto';
 import { UpdateExamDto } from './dto/update-exam.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -11,18 +11,23 @@ import { ItemDto, PageDto } from 'src/common/paginations/dtos/page.dto';
 import { PageMetaDto } from 'src/common/paginations/dtos/page.metadata.dto';
 import { paginationKeyword } from 'src/utils/keywork-pagination';
 import { Question } from 'src/questions/entities/question.entity';
-import { format } from 'date-fns';
+import { format, sub } from 'date-fns';
 import { Class } from 'src/classes/entities/class.entity';
 import { Subject } from 'src/subjects/entities/subject.entity';
 import { QuestionScore } from 'src/question-score/entities/question-score.entity';
 import { TypeQuestion } from 'src/type-questions/entities/type-question.entity';
 import { QuestionClone } from 'src/question-clone/entities/question-clone.entity';
+import { QuestionCloneService } from 'src/question-clone/question-clone.service';
+import { CreateQuestionCloneDto } from 'src/question-clone/dto/create-question-clone.dto';
+import { AnswerClone } from 'src/answer-clone/entities/answer-clone.entity';
 
 @Injectable()
 export class ExamsService {
   constructor(
     @InjectRepository(Exam)
     private readonly examRepo: Repository<Exam>,
+    @InjectRepository(AnswerClone)
+    private readonly answerCloneRepo: Repository<AnswerClone>,
     @InjectRepository(Question)
     private readonly questionRepo: Repository<Question>,
     @InjectRepository(Course)
@@ -37,6 +42,7 @@ export class ExamsService {
     private readonly typeQuestionRepo: Repository<TypeQuestion>,
     @InjectRepository(QuestionClone)
     private readonly questionCloneRepo: Repository<QuestionClone>,
+    private readonly questionCloneService: QuestionCloneService,
   ) { }
 
   async create(createExamDto: CreateExamDto, user: User) {
@@ -44,7 +50,7 @@ export class ExamsService {
       title,
       description,
       durationMinutes,
-      questionIds = [],
+      questionClones = [],
       questionScores = [],
       totalEssayScore,
       totalMultipleChoiceScore,
@@ -55,11 +61,13 @@ export class ExamsService {
       subjectId,
     } = createExamDto;
 
+    // Kiểm tra trùng tiêu đề
     const existing = await this.examRepo.findOne({ where: { title } });
     if (existing) {
       throw new BadRequestException('Tiêu đề đã tồn tại');
     }
-    // Kiểm tra tổng điểm câu hỏi tự luận
+
+    // Kiểm tra tổng điểm tự luận hợp lệ
     if (questionScores?.length > 0) {
       const totalEssayScoreSum = questionScores.reduce((sum, qs) => sum + (qs.score || 0), 0);
       if (totalEssayScoreSum > totalEssayScore) {
@@ -69,6 +77,7 @@ export class ExamsService {
       }
     }
 
+    // Lấy thông tin lớp học và môn học nếu có
     let classEntity: Class | null = null;
     if (classId) {
       classEntity = await this.classRepo.findOne({ where: { id: classId } });
@@ -81,6 +90,7 @@ export class ExamsService {
       if (!subjectEntity) throw new NotFoundException('Môn học không tồn tại');
     }
 
+    // Tạo đề thi ban đầu
     const exam = this.examRepo.create({
       title,
       description,
@@ -95,34 +105,69 @@ export class ExamsService {
       createdBy: user,
     });
 
-    if (questionIds.length > 0) {
-      const questions = await this.questionRepo.findBy({ id: In(questionIds) });
-      exam.questions = questions;
-    }
     const savedExam = await this.examRepo.save(exam);
-    // Nếu có questionScores → tạo liên kết lưu điểm riêng
+
+    // Nếu có QuestionClone thì tạo và liên kết với Exam
+    if (questionClones.length > 0) {
+      // Gom câu hỏi theo multipleChoiceId
+      const groupMap = new Map<number, CreateQuestionCloneDto[]>();
+
+      for (const qc of questionClones) {
+        if (!qc.multipleChoiceId) continue; // Bỏ qua nếu không có nhóm
+        const group = groupMap.get(qc.multipleChoiceId) || [];
+        group.push(qc);
+        groupMap.set(qc.multipleChoiceId, group);
+      }
+
+      // Tổng điểm theo nhóm multipleChoice
+      const scoreMap: Record<number, number> = {
+        1: totalMultipleChoiceScorePartI,
+        2: totalMultipleChoiceScorePartII,
+        3: totalMultipleChoiceScorePartIII,
+      };
+
+      const createdClones: QuestionClone[] = [];
+
+      for (const [mcId, group] of groupMap.entries()) {
+        const totalScore = scoreMap[mcId] ?? 0;
+        const perScore = group.length > 0 ? +(totalScore / group.length).toFixed(2) : 0;
+
+        for (const qcDto of group) {
+          const cloneToCreate = { ...qcDto, score: perScore };
+          const createdClone = await this.questionCloneService.create(cloneToCreate, user);
+          createdClones.push(createdClone);
+        }
+      }
+
+      savedExam.questionclones = createdClones;
+      await this.examRepo.save(savedExam);
+    }
+
+
+    // Nếu có câu hỏi tự luận thì tạo và liên kết điểm
     if (questionScores?.length > 0) {
-      const typeQuestion = await this.typeQuestionRepo.findOne({ where: { name: 'essay' } })
+      const typeQuestion = await this.typeQuestionRepo.findOne({ where: { name: 'essay' } });
+      const essayClones: QuestionClone[] = [];
       if (typeQuestion) {
         for (const qs of questionScores) {
-          // 1. Tạo câu hỏi tự luận
-          const newQuestion = this.questionRepo.create({
+          const newQuestionCloneEssay: CreateQuestionCloneDto = {
             content: qs.content,
-            typeQuestion: typeQuestion,
-            createdBy: user,
-          });
-
-          const savedQuestion = await this.questionRepo.save(newQuestion);
-
-          // 2. Tạo bản ghi QuestionScore
-          const questionScore = this.questionScoreRepo.create({
-            exam: savedExam,
-            question: savedQuestion,
+            typeQuestionId: typeQuestion.id,
             score: qs.score,
-          });
-
-          await this.questionScoreRepo.save(questionScore);
+            answerclones: [], // hoặc undefined cũng được
+            multipleChoiceId: undefined,
+            topicId: undefined,
+            levelId: undefined,
+          };
+          const savedQuestion = await this.questionCloneService.create(newQuestionCloneEssay, user);
+          essayClones.push(savedQuestion);
         }
+        savedExam.questionclones = [
+          ...(savedExam.questionclones || []),
+          ...essayClones,
+        ];
+
+        await this.examRepo.save(savedExam);
       }
     }
 
@@ -131,33 +176,43 @@ export class ExamsService {
   async findAll(
     pageOptions: PageOptionsDto,
     query: Partial<Exam> & { createdById?: number },
+    user: User,
   ): Promise<PageDto<Exam>> {
     const queryBuilder = this.examRepo
       .createQueryBuilder('exam')
       .leftJoinAndSelect('exam.class', 'class')
       .leftJoinAndSelect('exam.subject', 'subject')
       .leftJoinAndSelect('exam.createdBy', 'createdBy')
-      .leftJoinAndSelect('exam.questions', 'questions')
-      .leftJoinAndSelect('questions.topic', 'topic')
-      .leftJoinAndSelect('questions.answers', 'answers')
-      .leftJoinAndSelect('questions.typeQuestion', 'typeQuestion')
-      .leftJoinAndSelect('questions.level', 'level')
-      .leftJoinAndSelect('questions.multipleChoice', 'multipleChoice')
-      .leftJoinAndSelect('exam.questionScores', 'questionScores')
-      .leftJoinAndSelect('questionScores.question', 'essayQuestion');
+      .leftJoinAndSelect('exam.questionclones', 'questionclones')
+      .leftJoinAndSelect('questionclones.topic', 'topic')
+      .leftJoinAndSelect('questionclones.answerclones', 'answerclones')
+      .leftJoinAndSelect('questionclones.typeQuestion', 'typeQuestion')
+      .leftJoinAndSelect('questionclones.level', 'level')
+      .leftJoinAndSelect('questionclones.multipleChoice', 'multipleChoice')
+    // .leftJoinAndSelect('exam.questionScores', 'questionScores')
+    // .leftJoinAndSelect('questionScores.question', 'essayQuestion');
 
     const { skip, take, order = 'ASC', search } = pageOptions;
-    const pagination: string[] = paginationKeyword;
+    const { createdById, ...restQuery } = query;
 
-    if (query && Object.keys(query).length > 0) {
-      for (const key of Object.keys(query)) {
-        if (!pagination.includes(key)) {
-          if (key === 'createdById') {
-            queryBuilder.andWhere('createdBy.id = :createdById', { createdById: query[key] });
-          } else {
-            queryBuilder.andWhere(`exam.${key} = :${key}`, { [key]: query[key] });
-          }
-        }
+    if (createdById !== undefined) {
+      if (createdById === user.id) {
+        // Trường hợp 1: là chính người tạo -> lấy tất cả bài thi của họ
+        queryBuilder.andWhere('createdBy.id = :createdById', { createdById });
+      } else {
+        // Trường hợp 2: không phải người tạo -> chỉ lấy bài thi công khai
+        queryBuilder.andWhere('createdBy.id = :createdById AND exam.isPublic = true', { createdById });
+      }
+    } else {
+      // Trường hợp 3: không truyền createdById -> lấy bài công khai hoặc của chính user
+      queryBuilder.andWhere('(exam.isPublic = true OR createdBy.id = :userId)', { userId: user.id });
+    }
+
+    // Các điều kiện khác ngoài createdById
+    const paginationKeys = paginationKeyword;
+    for (const key of Object.keys(restQuery)) {
+      if (!paginationKeys.includes(key)) {
+        queryBuilder.andWhere(`exam.${key} = :${key}`, { [key]: restQuery[key] });
       }
     }
 
@@ -178,122 +233,130 @@ export class ExamsService {
     return new PageDto(items, pageMetaDto);
   }
   async findOne(id: number): Promise<ItemDto<Exam>> {
-    const exam = await this.examRepo.findOne({ where: { id }, relations: ['createdBy', 'class', 'subject', 'questions', 'questions.answers', 'questions.typeQuestion', 'questions.class', 'questions.level', 'questions.multipleChoice', 'questionScores', 'questionScores.question'] });
-    if (!exam) {
-      throw new NotFoundException(`Không tìm thấy Exam với ID: ${id}`);
-    }
-    return new ItemDto(exam);
-  }
-  async update(id: number, updateExamDto: UpdateExamDto, user: User): Promise<Exam> {
     const exam = await this.examRepo.findOne({
       where: { id },
-      relations: ['createdBy', 'questions', 'questionScores', 'questionScores.question'],
+      relations: [
+        'createdBy',
+        'class',
+        'subject',
+        'questionclones',
+        'questionclones.typeQuestion',
+        'questionclones.topic',
+        'questionclones.level',
+        'questionclones.multipleChoice',
+        'questionclones.answerclones',
+      ],
     });
 
     if (!exam) {
-      throw new NotFoundException(`Không tìm thấy bài thi với ID: ${id}`);
+      throw new NotFoundException(`Không tìm thấy Exam với ID: ${id}`);
     }
 
+    return new ItemDto(exam);
+  }
+  async update(id: number, updateExamDto: UpdateExamDto, user: User, rawQuestionClones: any[]) {
+    const exam = await this.examRepo.findOne({
+      where: { id },
+      relations: [
+        'createdBy',
+        'class',
+        'subject',
+        'questionclones',
+        'questionclones.typeQuestion',
+        'questionclones.topic',
+        'questionclones.level',
+        'questionclones.multipleChoice',
+        'questionclones.answerclones',
+      ],
+    });
+    // console.log(exam?.questionclones)
+    if (!exam) throw new NotFoundException(`Không tìm thấy bài thi với ID: ${id}`);
+    // console.log(rawQuestionClones)
     const {
       title,
       description,
       durationMinutes,
-      questionIds,
+      questionClones = [],
+      classId,
+      subjectId,
       totalMultipleChoiceScore,
       totalMultipleChoiceScorePartI,
       totalMultipleChoiceScorePartII,
       totalMultipleChoiceScorePartIII,
       totalEssayScore,
-      questionScores = []
     } = updateExamDto;
-
-    if (title !== undefined) {
-      exam.title = title;
+    let classEntity: Class | null = null;
+    if (classId) {
+      classEntity = await this.classRepo.findOne({ where: { id: classId } });
+      if (!classEntity) throw new NotFoundException('Lớp không tồn tại');
+      exam.class = classEntity
     }
 
-    if (description !== undefined) {
-      exam.description = description;
+    let subjectEntity: Subject | null = null;
+    if (subjectId) {
+      subjectEntity = await this.subjectRepo.findOne({ where: { id: subjectId } });
+      if (!subjectEntity) throw new NotFoundException('Môn học không tồn tại');
+      exam.subject = subjectEntity
     }
+    // Cập nhật thông tin cơ bản
+    if (title !== undefined) exam.title = title;
+    if (description !== undefined) exam.description = description;
+    if (durationMinutes !== undefined) exam.durationMinutes = durationMinutes;
+    if (totalMultipleChoiceScore !== undefined) exam.totalMultipleChoiceScore = totalMultipleChoiceScore;
+    if (totalMultipleChoiceScorePartI !== undefined) exam.totalMultipleChoiceScorePartI = totalMultipleChoiceScorePartI;
+    if (totalMultipleChoiceScorePartII !== undefined) exam.totalMultipleChoiceScorePartII = totalMultipleChoiceScorePartII;
+    if (totalMultipleChoiceScorePartIII !== undefined) exam.totalMultipleChoiceScorePartIII = totalMultipleChoiceScorePartIII;
+    if (totalEssayScore !== undefined) exam.totalEssayScore = totalEssayScore;
 
-    if (durationMinutes !== undefined) {
-      exam.durationMinutes = durationMinutes;
-    }
+    const currentQuestionClones = Array.isArray(exam.questionclones) ? exam.questionclones : [];
+    const currentIds = currentQuestionClones.map(q => q.id);
 
-    if (totalMultipleChoiceScore !== undefined) {
-      exam.totalMultipleChoiceScore = totalMultipleChoiceScore;
-    }
+    const updatedQuestionClones = Array.isArray(rawQuestionClones) ? rawQuestionClones : [];
+    const updatedIds = updatedQuestionClones.filter(q => q.id).map(q => q.id);
 
-    if (totalMultipleChoiceScorePartI !== undefined) {
-      exam.totalMultipleChoiceScorePartI = totalMultipleChoiceScorePartI;
-    }
+    const idsToRemove = currentIds.filter(id => !updatedIds.includes(id));
 
-    if (totalMultipleChoiceScorePartII !== undefined) {
-      exam.totalMultipleChoiceScorePartII = totalMultipleChoiceScorePartII;
-    }
+    // Xoá câu hỏi không còn trong danh sách gửi lên
+    exam.questionclones = currentQuestionClones.filter(q => updatedIds.includes(q.id));
+    await this.examRepo.save(exam);
 
-    if (totalMultipleChoiceScorePartIII !== undefined) {
-      exam.totalMultipleChoiceScorePartIII = totalMultipleChoiceScorePartIII;
-    }
-
-    if (totalEssayScore !== undefined) {
-      exam.totalEssayScore = totalEssayScore;
-    }
-
-    // ✅ Nếu truyền danh sách câu hỏi → cập nhật lại
-    if (Array.isArray(questionIds)) {
-      const questions = await this.questionRepo.findBy({ id: In(questionIds) });
-      exam.questions = questions;
-    }
-
-    const savedExam = await this.examRepo.save(exam);
-
-    const incomingIds = questionScores
-      .map(qs => qs.questionId)
-      .filter((id): id is number => typeof id === 'number');
-
-    // Xoá các questionScores bị loại khỏi danh sách
-    for (const old of exam.questionScores) {
-      if (!incomingIds.includes(old.question.id)) {
-        await this.questionScoreRepo.remove(old);
+    if (rawQuestionClones.length > 0) {
+      for (const qc of rawQuestionClones) {
+        if (qc.id) {
+          const questioncloneToUpdate = {
+            ...qc
+          }
+          // console.log(questioncloneToUpdate)
+          const questioncloneUpdate = await this.questionCloneService.update(qc.id, questioncloneToUpdate, user)
+        } else {
+          const newQuestionClone = {
+            ...qc,
+            // exam
+          }
+          // console.log(newQuestionClone)
+          const createdQuestion = await this.questionCloneService.create(newQuestionClone, user)
+          console.log(createdQuestion)
+          createdQuestion.exams = [exam];
+          await this.questionCloneRepo.save(createdQuestion);
+        }
       }
     }
+    const updatedExam = await this.examRepo.findOne({
+      where: { id: exam.id },
+      relations: [
+        'createdBy',
+        'class',
+        'subject',
+        'questionclones',
+        'questionclones.typeQuestion',
+        'questionclones.topic',
+        'questionclones.level',
+        'questionclones.multipleChoice',
+        'questionclones.answerclones',
+      ],
+    });
 
-    const typeQuestion = await this.typeQuestionRepo.findOne({ where: { name: 'essay' } });
-    if (!typeQuestion) throw new NotFoundException('Không tìm thấy loại câu hỏi essay');
-
-    for (const qs of questionScores) {
-      if (qs.questionId) {
-        const question = await this.questionRepo.findOne({ where: { id: qs.questionId } });
-        if (!question) throw new NotFoundException(`Không tìm thấy câu hỏi với ID ${qs.questionId}`);
-
-        if (qs.content && qs.content !== question.content) {
-          question.content = qs.content;
-          await this.questionRepo.save(question);
-        }
-
-        const existing = exam.questionScores.find(x => x.question.id === qs.questionId);
-        if (existing && existing.score !== qs.score) {
-          existing.score = qs.score;
-          await this.questionScoreRepo.save(existing);
-        }
-      } else {
-        const newQuestion = this.questionRepo.create({
-          content: qs.content,
-          typeQuestion,
-          createdBy: user,
-        });
-        const savedQuestion = await this.questionRepo.save(newQuestion);
-
-        const newScore = this.questionScoreRepo.create({
-          exam: savedExam,
-          question: savedQuestion,
-          score: qs.score,
-        });
-        await this.questionScoreRepo.save(newScore);
-      }
-    }
-
-    return savedExam;
+    return updatedExam;
   }
   async remove(id: number): Promise<ItemDto<Exam>> {
     const checkExam = await this.examRepo.findOne({
@@ -308,55 +371,87 @@ export class ExamsService {
     await this.examRepo.softRemove(checkExam);
     return new ItemDto(checkExam);
   }
-  async clone(id: number, user: User): Promise<Exam> {
-    const original = await this.examRepo.findOne({
-      where: { id },
+  async clone(examId: number, user: User) {
+    const exam = await this.examRepo.findOne({
+      where: { id: examId },
       relations: [
-        'questions',
-        'questionScores',
-        'questionScores.question',
+        'questionclones',
+        'questionclones.answerclones',
+        'questionclones.typeQuestion',
+        'questionclones.topic',
+        'questionclones.level',
+        'questionclones.multipleChoice',
         'class',
         'subject',
-        'createdBy',
       ],
     });
 
-    if (!original) {
-      throw new NotFoundException(`Không tìm thấy bài thi với ID: ${id}`);
-    }
+    if (!exam) throw new NotFoundException('Không tìm thấy đề thi để clone');
 
-    const timestamp = format(new Date(), 'dd/MM/yyyy HH:mm');
-    const newTitle = `${original.title} - Bản sao (${timestamp})`;
-
-    // 👉 Tạo exam mới
-    const newExam = this.examRepo.create({
-      title: newTitle,
-      description: original.description,
-      durationMinutes: original.durationMinutes,
-      totalMultipleChoiceScore: original.totalMultipleChoiceScore,
-      totalMultipleChoiceScorePartI: original.totalMultipleChoiceScorePartI,
-      totalMultipleChoiceScorePartII: original.totalMultipleChoiceScorePartII,
-      totalMultipleChoiceScorePartIII: original.totalMultipleChoiceScorePartIII,
-      totalEssayScore: original.totalEssayScore,
-      class: original.class,
-      subject: original.subject,
-      questions: original.questions,
+    const clonedExam = this.examRepo.create({
+      title: exam.title + ' (bản sao)',
+      description: exam.description,
+      durationMinutes: exam.durationMinutes,
+      totalEssayScore: exam.totalEssayScore,
+      totalMultipleChoiceScore: exam.totalMultipleChoiceScore,
+      totalMultipleChoiceScorePartI: exam.totalMultipleChoiceScorePartI,
+      totalMultipleChoiceScorePartII: exam.totalMultipleChoiceScorePartII,
+      totalMultipleChoiceScorePartIII: exam.totalMultipleChoiceScorePartIII,
+      class: exam.class ?? undefined,
+      subject: exam.subject ?? undefined,
       createdBy: user,
     });
 
-    const savedExam = await this.examRepo.save(newExam);
+    const savedExam = await this.examRepo.save(clonedExam);
 
-    // 👉 Clone lại các questionScores nếu có
-    for (const qs of original.questionScores) {
-      const clonedScore = this.questionScoreRepo.create({
-        exam: savedExam,
-        question: qs.question,
-        score: qs.score,
+    for (const qc of exam.questionclones) {
+      const newQuestionClone = this.questionCloneRepo.create({
+        content: qc.content,
+        typeQuestion: qc.typeQuestion,
+        topic: qc.topic,
+        level: qc.level,
+        score: qc.score,
+        multipleChoice: qc.multipleChoice,
+        createdBy: user,
+        exams: [savedExam], // Chính xác, vì quan hệ là ManyToMany
       });
 
-      await this.questionScoreRepo.save(clonedScore);
+      const savedQuestionClone = await this.questionCloneRepo.save(newQuestionClone);
+
+      for (const ac of qc.answerclones) {
+        const newAnswerClone = this.answerCloneRepo.create({
+          content: ac.content,
+          isCorrect: ac.isCorrect,
+          createdBy: user,
+          questionclone: savedQuestionClone, // Chính xác, theo field bạn cần
+        });
+
+        await this.answerCloneRepo.save(newAnswerClone);
+      }
     }
 
     return savedExam;
+  }
+  async toggleIsPublic(id: number, user: User | null): Promise<Exam> {
+    if (!user) {
+      throw new ForbiddenException('Bạn cần đăng nhập để thực hiện thao tác này');
+    }
+
+    const exam = await this.examRepo.findOne({
+      where: { id },
+      relations: ['createdBy'],
+    });
+
+    if (!exam) {
+      throw new NotFoundException(`Không tìm thấy bài thi với ID: ${id}`);
+    }
+
+    if (!exam.createdBy || exam.createdBy.id !== user.id) {
+      throw new ForbiddenException('Bạn không có quyền thay đổi trạng thái bài thi này');
+    }
+
+    exam.isPublic = !exam.isPublic;
+
+    return await this.examRepo.save(exam);
   }
 }

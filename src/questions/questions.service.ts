@@ -25,6 +25,7 @@ import { after } from 'node:test';
 export class QuestionsService {
   constructor(
     @InjectRepository(Question) private questionRepo: Repository<Question>,
+    @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(Exam) private examRepo: Repository<Exam>,
     @InjectRepository(Topic) private topicRepo: Repository<Topic>,
     @InjectRepository(Level) private levelRepo: Repository<Level>,
@@ -117,6 +118,19 @@ export class QuestionsService {
     query: Partial<Question> & { createdById?: number },
     user: User,
   ): Promise<PageDto<Question>> {
+    // console.log(user)
+    if (!user.classes || !user.subjects) {
+      const fullUser = await this.userRepo.findOne({
+        where: { id: user.id },
+        relations: ['classes', 'subjects'],
+      });
+
+      if (!fullUser) {
+        throw new NotFoundException('Người dùng không tồn tại');
+      }
+
+      user = fullUser;
+    }
     const queryBuilder = this.questionRepo
       .createQueryBuilder('question')
       .leftJoinAndSelect('question.subject', 'subject')
@@ -131,25 +145,32 @@ export class QuestionsService {
     const { skip, take, order = 'ASC', search } = pageOptions;
     const paginationKeys = paginationKeyword;
 
-    // 🔍 Điều kiện quyền truy cập
+    // 🔐 Điều kiện truy cập: là người tạo HOẶC public và cùng lớp + môn
     queryBuilder.andWhere(
       new Brackets(qb => {
         qb.where('createdBy.id = :userId', { userId: user.id })
           .orWhere(new Brackets(qb2 => {
             qb2.where('question.isPublic = true')
-              .andWhere('class.id IN (:...classIds)', { classIds: user.classes?.map(c => c.id) || [-1] })
-              .andWhere('subject.id IN (:...subjectIds)', { subjectIds: user.subjects?.map(s => s.id) || [-1] });
+              .andWhere('class.id IN (:...classIds)', {
+                classIds: user.classes?.map(c => c.id) || [-1],
+              })
+              .andWhere('subject.id IN (:...subjectIds)', {
+                subjectIds: user.subjects?.map(s => s.id) || [-1],
+              });
           }));
       })
     );
-
-    // 🔍 Lọc theo các điều kiện cụ thể
+    // 📌 Lọc các trường khác
     if (query && Object.keys(query).length > 0) {
       for (const key of Object.keys(query)) {
         if (!paginationKeys.includes(key) && query[key] !== undefined) {
           if (key === 'typeQuestionId') {
             queryBuilder.andWhere('typeQuestion.id = :typeQuestionId', {
               typeQuestionId: query[key],
+            });
+          } else if (key === 'createdById') {
+            queryBuilder.andWhere('createdBy.id = :createdById', {
+              createdById: query[key],
             });
           } else {
             queryBuilder.andWhere(`question.${key} = :${key}`, {
@@ -160,7 +181,7 @@ export class QuestionsService {
       }
     }
 
-    // 🔍 Tìm kiếm theo content
+    // 🔍 Tìm kiếm theo nội dung
     if (search) {
       queryBuilder.andWhere(
         `LOWER(unaccent(question.content)) ILIKE LOWER(unaccent(:search))`,
@@ -168,17 +189,14 @@ export class QuestionsService {
       );
     }
 
-    // 🧾 Sắp xếp và phân trang
-    const hasTake = 'take' in query && !isNaN(parseInt(query.take as string));
+    // 📦 Phân trang & sắp xếp
     queryBuilder.orderBy('question.id', order);
-    if (hasTake) {
-      queryBuilder.skip(skip).take(parseInt(query.take as string));
-    }
+    queryBuilder.skip(skip).take(take);
 
     const itemCount = await queryBuilder.getCount();
     const items = await queryBuilder.getMany();
 
-    // ✅ Sắp xếp câu trả lời theo id tăng dần
+    // ✅ Sắp xếp answer theo id
     for (const question of items) {
       if (Array.isArray(question.answers)) {
         question.answers.sort((a, b) => a.id - b.id);
@@ -188,8 +206,9 @@ export class QuestionsService {
     const pageMetaDto = new PageMetaDto({ pageOptionsDto: pageOptions, itemCount });
     return new PageDto(items, pageMetaDto);
   }
+
   async findOne(id: number): Promise<ItemDto<Question>> {
-    // console.log(id)
+
     const question = await this.questionRepo.findOne({
       where: { id },
       relations: [
@@ -217,6 +236,7 @@ export class QuestionsService {
   }
   async update(id: number, updateDto: UpdateQuestionDto, user: User) {
     // console.log(id, user)
+    console.log(id)
     const question = await this.questionRepo.findOne({
       where: { id },
       relations: ['createdBy', 'subject', 'topic', 'level', 'class', 'answers'],

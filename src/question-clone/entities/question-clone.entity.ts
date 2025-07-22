@@ -1,8 +1,10 @@
 import { AnswerClone } from "src/answer-clone/entities/answer-clone.entity";
 import { BaseWithCreatedBy } from "src/common/entities/base-user-createdBy";
 import { Exam } from "src/exams/entities/exam.entity";
+import { Level } from "src/levels/entities/level.entity";
 import { MultipeChoice } from "src/multipe-choice/entities/multipe-choice.entity";
 import { QuestionScore } from "src/question-score/entities/question-score.entity";
+import { Topic } from "src/topics/entities/topic.entity";
 import { TypeQuestion } from "src/type-questions/entities/type-question.entity";
 import { Column, Entity, JoinColumn, ManyToMany, ManyToOne, OneToMany } from "typeorm";
 
@@ -29,4 +31,11 @@ export class QuestionClone extends BaseWithCreatedBy {
     // questionScores: QuestionScore[];
     @Column('float')
     score: number;
+
+    @ManyToOne(() => Topic, { nullable: true })
+    @JoinColumn({ name: "topicId" })
+    topic: Topic;
+    @ManyToOne(() => Level, { nullable: true })
+    @JoinColumn({ name: "levelId" })
+    level: Level;
 }
