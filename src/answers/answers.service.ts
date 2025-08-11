@@ -16,20 +16,22 @@ export class AnswersService {
     @InjectRepository(Answer) private answerRepo: Repository<Answer>,
     @InjectRepository(Question) private questionRepo: Repository<Question>,
   ) { }
-  async create(createAnswerDto: CreateAnswerDto, user: User): Promise<Answer> {
+  async create(createAnswerDto: CreateAnswerDto, user: User) {
     // console.log('question')
     const { content, questionId, isCorrect } = createAnswerDto;
+    // console.log(content, questionId, isCorrect)
     const question = await this.questionRepo.findOne({
-      where: { id: questionId },
+      where: { id: questionId }, relations: ['answers'],
     });
-    const newAnswer = this.answerRepo.create({
+    // console.log(question)
+    return await this.answerRepo.save({
       content,
       isCorrect,
       question,
       createdBy: user,
     } as DeepPartial<Question>);
-
-    return await this.answerRepo.save(newAnswer);
+    // console.log(newAnswer)
+    // return await this.answerRepo.save(newAnswer);
   }
 
   async findAll(

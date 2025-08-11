@@ -18,5 +18,6 @@ import { AnswerClone } from 'src/answer-clone/entities/answer-clone.entity';
   imports: [TypeOrmModule.forFeature([Exam, Course, User, Question, Class, Subject, QuestionScore, TypeQuestion, QuestionClone, AnswerClone]), QuestionCloneModule],
   controllers: [ExamsController],
   providers: [ExamsService],
+  exports: [ExamsService],
 })
 export class ExamsModule {}

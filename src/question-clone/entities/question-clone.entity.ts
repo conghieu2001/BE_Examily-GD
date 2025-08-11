@@ -29,7 +29,7 @@ export class QuestionClone extends BaseWithCreatedBy {
 
     // @OneToMany(() => QuestionScore, qs => qs.question)
     // questionScores: QuestionScore[];
-    @Column('float')
+    @Column({ type: 'float'})
     score: number;
 
     @ManyToOne(() => Topic, { nullable: true })
@@ -38,4 +38,7 @@ export class QuestionClone extends BaseWithCreatedBy {
     @ManyToOne(() => Level, { nullable: true })
     @JoinColumn({ name: "levelId" })
     level: Level;
+
+    @Column({default: 1})
+    answerclonescount: number;
 }

@@ -16,8 +16,8 @@ export enum statusExam {
 export class CourseByExam extends BaseWithCreatedBy {
     @Column()
     title: string
-    @Column({ default: false })
-    isLocked: boolean;
+    // @Column({ default: false })
+    // isLocked: boolean;
 
     @Column({ nullable: true })
     password?: string;

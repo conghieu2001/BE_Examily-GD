@@ -14,8 +14,8 @@ export class Course extends BaseWithCreatedBy {
   @Column({ nullable: true })
   password?: string;
 
-  @Column({ default: false })
-  isLocked: boolean;
+  // @Column({ default: false })
+  // isLocked: boolean;
 
   @OneToMany(() => CourseByExam, courseByExam => courseByExam.course)
   courseByExams: CourseByExam[];

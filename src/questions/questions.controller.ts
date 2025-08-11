@@ -175,7 +175,7 @@ export class QuestionsController {
   @Roles(Role.ADMIN, Role.TEACHER, Role.STUDENT)
   findAll(@Query() pageOptionDto: PageOptionsDto, @Query() query: Partial<Question>, @Req() request: Request) {
     const user: User = request['user'] ?? null;
-    return this.questionsService.findAll(pageOptionDto, query, user);
+    return this.questionsService.findAll(pageOptionDto, query, user,request);
   }
 
   @Get('getbymultipchoice/:id')

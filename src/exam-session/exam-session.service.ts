@@ -1,13 +1,15 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateExamSessionDto } from './dto/create-exam-session.dto';
 import { UpdateExamSessionDto } from './dto/update-exam-session.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ExamSession } from './entities/exam-session.entity';
-import { Repository } from 'typeorm';
-import { CourseByExam } from 'src/course-by-exams/entities/course-by-exam.entity';
+import { In, Repository } from 'typeorm';
+import { CourseByExam, statusExam } from 'src/course-by-exams/entities/course-by-exam.entity';
 import { User } from 'src/users/entities/user.entity';
 import { SubmitAnswer } from 'src/submit-answer/entities/submit-answer.entity';
 import { Question } from 'src/questions/entities/question.entity';
+import { QuestionClone } from 'src/question-clone/entities/question-clone.entity';
+import { TypeQuestion } from 'src/type-questions/entities/type-question.entity';
 
 @Injectable()
 export class ExamSessionService {
@@ -15,7 +17,435 @@ export class ExamSessionService {
     @InjectRepository(ExamSession) private examsessionRepo: Repository<ExamSession>,
     @InjectRepository(CourseByExam) private courseByExamRepo: Repository<CourseByExam>,
     @InjectRepository(SubmitAnswer) private submitAnswerRepo: Repository<SubmitAnswer>,
+    @InjectRepository(QuestionClone) private questionCloneRepo: Repository<QuestionClone>,
+    @InjectRepository(User) private userRepo: Repository<User>,
   ) { }
+  async saveMultipleAnswers(
+    sessionId: number,
+    answers: {
+      questionId: number;
+      selectedOption?: number[];
+      selectedPairs?: { id: number; content: string; isCorrect: boolean }[];
+      essayAnswer?: string;
+      order?: number;
+    }[],
+    user: User,
+  ) {
+    // console.log(user)
+    const session = await this.examsessionRepo.findOne({
+      where: { id: sessionId },
+      relations: ['createdBy'],
+    });
+    if (!session) throw new NotFoundException('Không tìm thấy phiên làm bài');
+
+    const questionIds = answers.map(a => a.questionId);
+    const questions = await this.questionCloneRepo.find({
+      where: { id: In(questionIds) },
+      relations: ['multipleChoice',],
+    });
+    const questionMap = new Map<number, QuestionClone>();
+    questions.forEach(q => questionMap.set(q.id, q));
+    // const creator = await this.userRepo.findOne({ where: { id: user.id } });
+    for (const answerData of answers) {
+      const question = questionMap.get(answerData.questionId);
+      if (!question) continue;
+
+      const existingAnswer = await this.submitAnswerRepo.findOne({
+        where: {
+          session: { id: sessionId },
+          questionclone: { id: question.id },
+        },
+      });
+      // console.log(existingAnswer)
+      const commonFields = {
+        order: answerData.order ?? 0,
+        createdBy: user
+      };
+
+      let data: any = { ...commonFields };
+      const part = question.multipleChoice?.name;
+
+      if (part === 'Phần I') {
+        // console.log(1)
+        data.selectedOption = answerData.selectedOption || [];
+      } else if (part === 'Phần II') {
+        // console.log(2)
+        data.selectedPairs = answerData.selectedPairs || [];
+      } else if (part === 'Phần III' || question.typeQuestion === TypeQuestion.ESSAY) {
+        // console.log(3)
+        data.essayAnswer = answerData.essayAnswer?.trim() || '';
+      }
+
+      if (existingAnswer) {
+        this.submitAnswerRepo.merge(existingAnswer, data);
+        // console.log(user)
+        await this.submitAnswerRepo.save(existingAnswer);
+      } else {
+        const newAnswer = await this.submitAnswerRepo.save({
+          session,
+          questionclone: question,
+          ...data,
+        });
+        // await this.submitAnswerRepo.save(newAnswer);
+        // console.log(newAnswer)
+      }
+    }
+    return { success: true };
+  }
+  async submitExam(
+    sessionId: number,
+    answers: {
+      questionId: number;
+      selectedOption?: number[];
+      selectedPairs?: { id: number; content: string; isCorrect: boolean }[];
+      essayAnswer?: string;
+      order?: number;
+    }[],
+    user: User
+  ) {
+    // console.log(answers)
+    // Lưu câu trả lời
+    await this.saveMultipleAnswers(sessionId, answers, user);
+
+    // Lấy dữ liệu bài thi
+    const session = await this.examsessionRepo.findOne({
+      where: { id: sessionId },
+      relations: [
+        'createdBy',
+        'answers',
+        'answers.createdBy',
+        'answers.questionclone',
+        'answers.questionclone.multipleChoice',
+        'answers.questionclone.answerclones',
+        'courseByExam',
+        'courseByExam.exam',
+      ],
+    });
+
+    if (!session) throw new NotFoundException('Không tìm thấy phiên làm bài');
+
+    const now = new Date();
+    session.isSubmitted = true;
+    session.submittedAt = now;
+
+    let totalMultipleChoiceScore = 0;
+    let questionCountI = 0
+    // let questionCountII = 0
+    let questionCountIII = 0
+    let scoreI = 0
+    let scoreII = 0
+    let scoreIII = 0
+    for (const answer of session.answers) {
+      const question = answer.questionclone;
+      const correctAnswers = question?.answerclones || [];
+      if (!question || correctAnswers.length === 0) continue;
+      // correctcounte++
+      const score = question.score || 0;
+
+      // ================== PHẦN I: Nhiều đáp án ==================
+      if (question.multipleChoice.name === 'Phần I') {
+        const selectedIds = (answer.selectedOption || []).slice().sort((a, b) => a - b);
+        const correctIds = correctAnswers
+          .filter(a => a.isCorrect)
+          .map(a => a.id)
+          .sort((a, b) => a - b);
+
+        const isCorrect =
+          selectedIds.length === correctIds.length &&
+          selectedIds.every((id, i) => id === correctIds[i]);
+
+        answer.isCorrect = isCorrect;
+        answer.pointsAchieved = isCorrect ? score : 0;
+
+        if (isCorrect) {
+          questionCountI++
+          scoreI += score
+          totalMultipleChoiceScore += score;
+        }
+      }
+
+      // ================== PHẦN II: Đúng / Sai từng đáp án ==================
+      else if (question.multipleChoice.name === 'Phần II') {
+        // console.log(answer.selectedPairs)
+        const studentPairs = answer?.selectedPairs || [];
+        // console.log(answer.selectedPairs, '1111')
+        let correctCount = 0;
+        for (const correctAns of correctAnswers) {
+          // console.log(correctAns)
+          const matched = studentPairs.find(
+            a => a.id === correctAns.id && a.isCorrect === correctAns.isCorrect
+          );
+          if (matched) correctCount++;
+        }
+        // console.log(correctCount)
+
+        const percentCorrect = correctCount / correctAnswers.length;
+        const partialScore = +(score * percentCorrect).toFixed(2);
+        // console.log(partialScore)
+        answer.isCorrect = percentCorrect === 1;
+        answer.pointsAchieved = partialScore;
+        scoreII += partialScore
+        totalMultipleChoiceScore += partialScore;
+      }
+
+      // ================== PHẦN III: So sánh chuỗi ==================
+      else if (question.multipleChoice.name === 'Phần III') {
+        // console.log(question)
+        const expected = correctAnswers[0]?.content?.trim().toLowerCase() || '';
+        const studentAnswer = (answer.essayAnswer || '').trim().toLowerCase();
+
+        const isCorrect = expected === studentAnswer;
+
+        answer.isCorrect = isCorrect;
+        answer.pointsAchieved = isCorrect ? score : 0;
+
+        if (isCorrect) {
+          questionCountIII++
+          scoreIII += score
+          totalMultipleChoiceScore += score;
+        }
+      }
+    }
+
+    // Lưu kết quả tổng
+    session.totalMultipleChoiceScore = totalMultipleChoiceScore;
+    session.totalScore = totalMultipleChoiceScore
+    // session.correctCount = correctcounte
+    await this.submitAnswerRepo.save(session.answers);
+    await this.examsessionRepo.save(session);
+
+    return {
+      success: true,
+      submittedAt: now,
+      totalScore: totalMultipleChoiceScore,
+      totalCorrectPartI: {
+        questionCountI,
+        scoreI
+      },
+      totalCorrectPartII: {
+        scoreII
+      },
+      totalCorrectPartIII: {
+        questionCountIII,
+        scoreIII
+      },
+    };
+  }
+
+  async findOneExamSessionDetail(sessionId: number, user) {
+    const session = await this.examsessionRepo.findOne({
+      where: { id: sessionId },
+      relations: [
+        'createdBy',
+        'answers',
+        'answers.createdBy',
+        'answers.questionclone',
+        'answers.questionclone.answerclones',
+        'courseByExam',
+        'courseByExam.exam',
+      ],
+      order: {
+        answers: {
+          order: 'ASC',
+        },
+      },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Không tìm thấy phiên làm bài');
+    }
+
+    // Kiểm tra quyền truy cập
+    const isOwner = session.createdBy?.id === user.id;
+    const isTeacher = user.role === 'Giáo viên'
+    if (!isOwner && !isTeacher) {
+      throw new ForbiddenException('Bạn không có quyền xem phiên làm bài này');
+    }
+
+    // Chuẩn hóa dữ liệu trả về
+    const result = {
+      sessionId: session.id,
+      startedAt: session.startedAt,
+      submittedAt: session.submittedAt,
+      isSubmitted: session.isSubmitted,
+      totalScore: session.totalScore,
+      totalMultipleChoiceScore: session.totalMultipleChoiceScore,
+      essayScore: session.essayScore,
+      correctCount: session.correctCount,
+      exam: {
+        id: session.courseByExam.exam.id,
+        title: session.courseByExam.exam.title,
+      },
+      questions: session.answers.map(answer => ({
+        questionId: answer.questionclone.id,
+        content: answer.questionclone.content,
+        typeQuestionId: answer.questionclone.typeQuestion,
+        answerClones: answer.questionclone.answerclones,
+        selectedOption: answer.selectedOption,
+        selectedPairs: answer.selectedPairs,
+        essayAnswer: answer.essayAnswer,
+        isCorrect: answer.isCorrect,
+        pointsAchieved: answer.pointsAchieved,
+        order: answer.order,
+      })),
+    };
+
+    return result;
+  }
+
+  async findAllExamSessions(courseByExamId: number, user): Promise<any[]> {
+    const sessions = await this.examsessionRepo.find({
+      relations: [
+        'courseByExam',
+        'courseByExam.createdBy', // để check GV tạo
+        'courseByExam.exam',
+        'courseByExam.students',
+        'answers',
+        'answers.questionclone',
+        // 'answers.createdBy',
+        'answers.questionclone.answerclones',
+        'createdBy',
+      ],
+      where: {
+        courseByExam: {
+          id: courseByExamId,
+          createdBy: { id: user.id } // chỉ cho xem nếu là GV tạo
+        }
+      },
+      order: { startedAt: 'DESC' },
+    });
+    return sessions
+    // return sessions.map((session) => ({
+    //   sessionId: session.id,
+    //   examTitle: session.courseByExam.exam.title,
+    //   startedAt: session.startedAt,
+    //   submittedAt: session.submittedAt,
+    //   isSubmitted: session.isSubmitted,
+    //   totalScore: session.totalScore,
+    //   totalMultipleChoiceScore: session.totalMultipleChoiceScore,
+    //   essayScore: session.essayScore,
+    //   correctCount: session.correctCount,
+    //   student: {
+    //     id: session.createdBy.id,
+    //     name: session.createdBy.fullName
+    //   }
+    // }));
+  }
+
+  async updateExamSessionScore(
+    sessionId: number,
+    answers: { id: number; pointsAchieved: number }[],
+    user: User
+  ) {
+    // Lấy session + courseByExam + createdBy
+    const session = await this.examsessionRepo.findOne({
+      where: { id: sessionId },
+      relations: [
+        'courseByExam',
+        'courseByExam.createdBy', // để check giáo viên tạo
+        'answers',
+      ],
+    });
+
+    if (!session) {
+      throw new NotFoundException('Không tìm thấy phiên làm bài');
+    }
+
+    // Kiểm tra quyền: chỉ giáo viên tạo courseByExam mới được chấm
+    if (!session.courseByExam?.createdBy || session.courseByExam.createdBy.id !== user.id) {
+      throw new ForbiddenException('Bạn không có quyền chấm bài thi này');
+    }
+
+    if (!session.isSubmitted) {
+      throw new BadRequestException('Bài thi chưa được nộp, không thể chấm điểm');
+    }
+
+    // Lấy danh sách SubmitAnswer cần update
+    const submitAnswers = await this.submitAnswerRepo.find({
+      where: {
+        session: { id: sessionId },
+        id: In(answers.map((a) => a.id)),
+      },
+    });
+
+    if (!submitAnswers.length) {
+      throw new NotFoundException('Không tìm thấy câu trả lời cần chấm điểm');
+    }
+
+    const pointsMap = new Map(answers.map((a) => [a.id, a.pointsAchieved]));
+
+    // Update điểm từng câu
+    submitAnswers.forEach((ans) => {
+      ans.pointsAchieved = pointsMap.get(ans.id) ?? 0;
+    });
+
+    await this.submitAnswerRepo.save(submitAnswers);
+
+    // Tính lại essayScore & totalScore
+    session.essayScore = session.answers.reduce(
+      (total, a) => total + (a.pointsAchieved || 0),
+      0
+    );
+    session.totalScore =
+      (session.totalMultipleChoiceScore || 0) + (session.essayScore || 0);
+
+    await this.examsessionRepo.save(session);
+
+    return {
+      message: 'Cập nhật điểm thành công',
+      totalScore: session.totalScore,
+      essayScore: session.essayScore,
+    };
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   async create(createExamSessionDto: CreateExamSessionDto) {
     return 'This action adds a new examSession';
   }
@@ -31,163 +461,6 @@ export class ExamSessionService {
   remove(id: number) {
     return `This action removes a #${id} examSession`;
   }
-  shuffle(arr: any[]) {
-    return arr
-      .map(value => ({ value, sort: Math.random() }))
-      .sort((a, b) => a.sort - b.sort)
-      .map(({ value }) => value);
-  }
-  toDto(question: Question) {
-    const labels = ['A', 'B', 'C', 'D', 'E', 'F']; // để mở rộng
-    const options = question.answers.map((ans, idx) => ({
-      label: labels[idx] ?? `Option ${idx + 1}`,
-      id: ans.id,
-      content: ans.content,
-    }));
 
-    return {
-      id: question.id,
-      content: question.content,
-      options, // [{ label: 'A', content: 'Hà Nội', id: 1 }, ...]
-    };
-  }
-  async startExam(courseByExamId: number, user: User) {
-    const courseByExam = await this.courseByExamRepo.findOne({
-      where: { id: courseByExamId },
-      relations: ['exam', 'exam.questions'],
-    });
-    if (!courseByExam) throw new NotFoundException('CourseByExam không tồn tại');
-
-    const shuffled = this.shuffle(courseByExam.exam.questions);
-    const session = this.examsessionRepo.create({
-      createdBy: user,
-      courseByExam,
-      startedAt: new Date(),
-      isSubmitted: false,
-    });
-    await this.examsessionRepo.save(session);
-
-    const answers = shuffled.map((q, index) => {
-      return this.submitAnswerRepo.create({
-        session,
-        question: q,
-        selectedOption: null,
-        isCorrect: false,
-        order: index,
-      });
-    });
-    await this.submitAnswerRepo.save(answers);
-
-    return {
-      sessionId: session.id,
-      total: answers.length,
-      currentIndex: 0,
-      question: this.toDto(answers[0].question),
-    };
-  }
-  async navigateQuestion({
-    sessionId,
-    currentQuestionId,
-    selectedOption,
-    nextIndex,
-  }: {
-    sessionId: number;
-    currentQuestionId: number;
-    selectedOption: string | null;
-    nextIndex: number;
-  }) {
-    // 1. Lưu lại đáp án hiện tại
-    if (selectedOption !== undefined && selectedOption !== null) {
-      const currentAnswer = await this.submitAnswerRepo.findOne({
-        where: {
-          session: { id: sessionId },
-          question: { id: currentQuestionId },
-        },
-        relations: ['question', 'question.answers'],
-      });
-
-      if (!currentAnswer) throw new NotFoundException('Không tìm thấy câu trả lời');
-      currentAnswer.selectedOption = selectedOption;
-
-      const correctAnswer = currentAnswer.question.answers.find(a => a.isCorrect);
-      currentAnswer.isCorrect = correctAnswer?.content === selectedOption;
-
-      await this.submitAnswerRepo.save(currentAnswer);
-    }
-
-    // 2. Trả về câu hỏi tiếp theo
-    const nextAnswer = await this.submitAnswerRepo.findOne({
-      where: {
-        session: { id: sessionId },
-        order: nextIndex,
-      },
-      relations: ['question', 'question.answers'],
-    });
-
-    if (!nextAnswer) throw new NotFoundException('Không tìm thấy câu hỏi tiếp theo');
-
-    const total = await this.submitAnswerRepo.count({ where: { session: { id: sessionId } } });
-
-    return {
-      index: nextIndex,
-      total,
-      selectedOption: nextAnswer.selectedOption,
-      question: this.toDto(nextAnswer.question),
-    };
-  }
-  async finalSubmitExam(sessionId: number, answers: {
-    questionId: number;
-    selectedOption?: string;
-    essayAnswer?: string;
-  }[]) {
-    const session = await this.examsessionRepo.findOne({
-      where: { id: sessionId },
-      relations: ['answers', 'answers.question', 'answers.question.answers', 'courseByExam', 'courseByExam.exam'],
-    });
-
-    if (!session) throw new NotFoundException('Không tìm thấy phiên làm bài');
-    if (session.isSubmitted) throw new BadRequestException('Bài thi đã được nộp');
-
-    let correctCount = 0;
-
-    for (const a of answers) {
-      const answer = session.answers.find(ans => ans.question.id === a.questionId);
-      if (!answer) continue;
-
-      // Nếu là trắc nghiệm
-      if (a.selectedOption !== undefined) {
-        answer.selectedOption = a.selectedOption;
-
-        const correct = answer.question.answers.find(opt => opt.isCorrect);
-        answer.isCorrect = correct?.content === a.selectedOption;
-
-        if (answer.isCorrect) correctCount++;
-      }
-
-      // Nếu là tự luận
-      if (a.essayAnswer !== undefined) {
-        answer.essayAnswer = a.essayAnswer;
-      }
-    }
-
-    const totalMcq = session.courseByExam.exam.totalMultipleChoiceScore;
-    const mcqDone = session.answers.filter(a => a.selectedOption !== null).length;
-    const scorePerQuestion = mcqDone > 0 ? totalMcq / mcqDone : 0;
-
-    session.correctCount = correctCount;
-    session.totalScore = parseFloat((correctCount * scorePerQuestion).toFixed(2));
-    session.submittedAt = new Date();
-    session.isSubmitted = true;
-
-    await this.submitAnswerRepo.save(session.answers);
-    await this.examsessionRepo.save(session);
-
-    return {
-      message: 'Nộp bài thành công',
-      correctCount,
-      total: mcqDone,
-      score: session.totalScore,
-    };
-  }
 
 }

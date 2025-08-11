@@ -26,15 +26,15 @@ export class Exam extends BaseWithCreatedBy {
   @Column({ name: 'duration_minutes', type: 'int' })
   durationMinutes: number;
 
-  @Column()
+  @Column({type: 'float', nullable: true })
   totalMultipleChoiceScore: number;
-  @Column({ nullable: true })
+  @Column({type: 'float', nullable: true })
   totalMultipleChoiceScorePartI: number;
-  @Column({ nullable: true })
+  @Column({type: 'float', nullable: true })
   totalMultipleChoiceScorePartII: number;
-  @Column({ nullable: true })
+  @Column({type: 'float', nullable: true })
   totalMultipleChoiceScorePartIII: number;
-  @Column()
+  @Column({type: 'float', nullable: true,})
   totalEssayScore: number;
 
   @ManyToMany(() => Question, question => question.exams)
@@ -45,15 +45,19 @@ export class Exam extends BaseWithCreatedBy {
   @JoinTable()
   questionclones: QuestionClone[];
 
-  @ManyToOne(() => Subject, { nullable: true, onDelete: 'SET NULL' })
+  @ManyToOne(() => Class, cls => cls.exams, { nullable: true })
+  @JoinColumn({ name: 'classId' })
+  class: Class;
+
+  @ManyToOne(() => Subject, subj => subj.exams, { nullable: true })
   @JoinColumn({ name: 'subjectId' })
   subject: Subject;
 
-  @ManyToOne(() => Class, { nullable: true, onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'classId' })
-  class: Class;
 
   @OneToMany(() => QuestionScore, qs => qs.exam, { cascade: true })
   // @JoinColumn({ name: 'questionScoreId' })
   questionScores: QuestionScore[];
+
+  @Column({default: false})
+  isCourseByExam: boolean
 }

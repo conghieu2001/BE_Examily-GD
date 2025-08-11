@@ -29,6 +29,7 @@ export class QuestionCloneService {
     private readonly answercloneService: AnswerCloneService,
   ) { }
   async create(createQuestionCloneDto: CreateQuestionCloneDto, user: User): Promise<QuestionClone> {
+    console.log('created')
     // console.log(createQuestionCloneDto.exam)
     const { content, typeQuestionId, multipleChoiceId, score, answerclones, topicId, levelId } = createQuestionCloneDto
     // Tìm các entity liên quan
@@ -60,6 +61,7 @@ export class QuestionCloneService {
         topic,
         level,
         score,
+        answerclonescount: answerclones.filter(a => a.isCorrect).length,
         // exams,
         createdBy: user
       })
@@ -76,6 +78,7 @@ export class QuestionCloneService {
       return questionClone
     } else {
       //Tạo câu hỏi
+      // console.log(content, typeQuestion, score)
       const newQuestionClone = this.questionCloneRepo.create({
         content,
         typeQuestion,
@@ -156,6 +159,7 @@ export class QuestionCloneService {
     return new PageDto(items, pageMetaDto);
   }
   async findOne(id: number): Promise<ItemDto<QuestionClone>> {
+    // console.log('hjhj')
     const questionclone = await this.questionCloneRepo.findOne({
       where: { id },
       relations: [
@@ -176,18 +180,18 @@ export class QuestionCloneService {
     return new ItemDto(questionclone);
   }
   async update(id: number, updateQuestionCloneDto: UpdateQuestionCloneDto, user: User) {
-    // console.log(id,updateQuestionCloneDto, user)                                                                                                                                                              
+    // console.log('updated', updateQuestionCloneDto)
+    // console.log(updateQuestionCloneDto)
     const questionclone = await this.questionCloneRepo.findOne({
       where: { id },
       relations: ['createdBy', 'answerclones'],
-    })
-    if (!questionclone) {
-      throw new NotFoundException(`Không tìm thấy questionclone với ID: ${id}`);
-    }
-    if (!(user && (user.isAdmin === true || questionclone.createdBy?.id === user.id))) {
+    });
+
+    if (!questionclone) throw new NotFoundException(`Không tìm thấy questionclone với ID: ${id}`);
+    if (!(user && (user.isAdmin || questionclone.createdBy?.id === user.id))) {
       throw new ForbiddenException('Bạn không có quyền cập nhật câu hỏi này');
     }
-    // console.log(questionclone)
+
     const {
       content,
       typeQuestionId,
@@ -195,54 +199,97 @@ export class QuestionCloneService {
       answerclones,
       score,
       topicId,
-      levelId
-    } = updateQuestionCloneDto
+      levelId,
+    } = updateQuestionCloneDto;
+
     if (content !== undefined) questionclone.content = content;
-    let tq: TypeQuestion | null = null;
+    if (score !== undefined) questionclone.score = score;
 
     if (typeQuestionId !== undefined) {
-      tq = await this.typeQuestionRepo.findOne({ where: { id: typeQuestionId } });
+      const tq = await this.typeQuestionRepo.findOne({ where: { id: typeQuestionId } });
       if (!tq) throw new NotFoundException('Type_Question không tồn tại');
       questionclone.typeQuestion = tq;
     }
 
-    if (score !== undefined) questionclone.score = score;
-    if (tq?.name === 'essay') {
-      console.log('essay update')
-    } else {
-      // console.log(answerclones)
-      if (multipleChoiceId !== undefined) {
-        const multipleChoice = await this.multipeChoiceRepo.findOne({ where: { id: multipleChoiceId } });
-        if (!multipleChoice) throw new NotFoundException('MultipleChoice không tồn tại');
-        questionclone.multipleChoice = multipleChoice;
+    if (topicId !== undefined) {
+      const topic = await this.topicRepo.findOne({ where: { id: topicId } });
+      if (!topic) throw new NotFoundException('Topic không tồn tại');
+      questionclone.topic = topic;
+    }
+
+    if (levelId !== undefined) {
+      const level = await this.levelRepo.findOne({ where: { id: levelId } });
+      if (!level) throw new NotFoundException('Level không tồn tại');
+      questionclone.level = level;
+    }
+
+    if (multipleChoiceId !== undefined) {
+      const multipleChoice = await this.multipeChoiceRepo.findOne({ where: { id: multipleChoiceId } });
+      if (!multipleChoice) throw new NotFoundException('MultipleChoice không tồn tại');
+      questionclone.multipleChoice = multipleChoice;
+    }
+
+    // Xử lý answerclones nếu không phải essay
+    if (questionclone.typeQuestion?.name !== 'essay' && Array.isArray(answerclones)) {
+      const existingAnswers = questionclone.answerclones;
+
+      const updatedAnswerIds = (answerclones || [])
+        .filter((ac: any) => ac.id)
+        .map((ac: any) => ac.id);
+
+      // XÓA các answerclones cũ không còn tồn tại
+      const toDelete = existingAnswers.filter(a => !updatedAnswerIds.includes(a.id));
+      for (const del of toDelete) {
+        // console.log(del.id)
+        await this.answerCloneRepo.delete(del.id);
       }
-      if (topicId !== undefined) {
-        const topic = await this.topicRepo.findOne({ where: { id: topicId } });
-        if (!topic) throw new NotFoundException('Topic không tồn tại');
-        questionclone.topic = topic;
-      }
-      if (levelId !== undefined) {
-        const level = await this.levelRepo.findOne({ where: { id: levelId } });
-        if (!level) throw new NotFoundException('Level không tồn tại');
-        questionclone.level = level;
-      }
-      // ✅ Cập nhật từng answer theo ID
-      if (answerclones && Array.isArray(answerclones)) {
-        questionclone.answerclones.sort((a, b) => a.id - b.id);
-        for (let i = 0; i < answerclones.length; i++) {
-          const a = answerclones[i] as any
-          const answer = questionclone.answerclones[i]
-          const updated = this.answerCloneRepo.merge(answer, {
-            content: a.content,
-            isCorrect: a.isCorrect,
+      const validAnswers = answerclones.filter(
+        (ac: any) => !toDelete.some(d => d.id === ac.id)
+      );
+
+      // Convert DTOs thành entity
+      const validAnswerEntities = validAnswers.map(dto =>
+        this.answerCloneRepo.create(dto)
+      );
+
+      questionclone.answerclones = validAnswerEntities;
+      // console.log(updatedAnswerIds, toDelete)
+      // CẬP NHẬT hoặc THÊM MỚI answerclones
+      const savedAnswers: AnswerClone[] = [];
+
+      for (const ac of answerclones) {
+        // console.log(ac)
+        const answerId = (ac as any).id;
+        if (answerId) {
+          // Cập nhật
+          await this.answerCloneRepo.update(answerId, {
+            content: ac.content,
+            isCorrect: ac.isCorrect,
           });
-          await this.answerCloneRepo.update(answer.id, updated);
+          const updated = await this.answerCloneRepo.findOne({ where: { id: answerId } });
+          if (updated) savedAnswers.push(updated);
+        } else {
+          // Tạo mới
+          const newAnswer = this.answerCloneRepo.create({
+            content: ac.content,
+            isCorrect: ac.isCorrect,
+            questionclone: questionclone,
+          });
+          const saved = await this.answerCloneRepo.save(newAnswer);
+          savedAnswers.push(saved);
         }
       }
+
+      // Gán lại theo đúng thứ tự
+      questionclone.answerclones = savedAnswers;
+      await this.questionCloneRepo.save(questionclone);
+
     }
+
     const updated = await this.questionCloneRepo.save(questionclone);
     return new ItemDto(updated);
   }
+
   remove(id: number) {
     return `This action removes a #${id} questionClone`;
   }

@@ -14,4 +14,7 @@ export class Class extends BaseWithCreatedBy {
 
     @ManyToMany(() => User, user => user.classes)
     users: User[];
+
+    @OneToMany(() => Exam, exam => exam.class)
+    exams: Exam[];
 }

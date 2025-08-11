@@ -1,5 +1,6 @@
 import { Class } from "src/classes/entities/class.entity";
 import { BaseWithCreatedBy } from "src/common/entities/base-user-createdBy";
+import { Exam } from "src/exams/entities/exam.entity";
 import { Question } from "src/questions/entities/question.entity";
 import { Topic } from "src/topics/entities/topic.entity";
 import { User } from "src/users/entities/user.entity";
@@ -22,4 +23,7 @@ export class Subject extends BaseWithCreatedBy {
 
     @ManyToMany(() => User, user => user.subjects)
     users: User[];
+
+    @OneToMany(() => Exam, exam => exam.subject)
+    exams: Exam[];
 }

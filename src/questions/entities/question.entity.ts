@@ -43,4 +43,7 @@ export class Question extends BaseWithCreatedBy {
 
     @OneToMany(() => QuestionScore, qs => qs.question)
     questionScores: QuestionScore[];
+
+    // @Column({default: 1})
+    // answerscount: number;
 }

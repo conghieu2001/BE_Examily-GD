@@ -21,19 +21,19 @@ export class ExamsController {
     const user: User = request['user'] ?? null;
     return this.examsService.create(createExamDto, user);
   }
-
+  @Get('origins')
+  @Roles(Role.ADMIN && Role.TEACHER)
+  findAllByExamReal(@Query() pageOptionDto: PageOptionsDto, @Query() query: Partial<Exam>, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.examsService.findAllExamReal(pageOptionDto, query, user,request);
+  }
   @Get()
   @Roles(Role.ADMIN && Role.TEACHER)
   findAll(@Query() pageOptionDto: PageOptionsDto, @Query() query: Partial<Exam>, @Req() request: Request) {
     const user: User = request['user'] ?? null;
-    return this.examsService.findAll(pageOptionDto, query, user);
+    return this.examsService.findAll(pageOptionDto, query, user,request);
   }
-
-  @Get(':id')
-  @Public()
-  findOne(@Param('id') id: string) {
-    return this.examsService.findOne(+id);
-  }
+  
   @Patch('toggle-public/:id')
   @Roles(Role.ADMIN && Role.TEACHER)
   async toggleIsPublic(
@@ -51,6 +51,12 @@ export class ExamsController {
   ) {
     const user = req['user'];
     return await this.examsService.clone(+id, user);
+  }
+  @Get(':id')
+  @Roles(Role.ADMIN && Role.TEACHER)
+  findOne(@Param('id') id: string, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.examsService.findOne(+id, user);
   }
 
   @Patch(':id')

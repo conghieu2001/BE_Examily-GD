@@ -75,6 +75,7 @@ export class QuestionsService {
           subject,
           topic,
           level,
+          // answerscount: answers.filter(a => a.isCorrect === true).length,
           class: checkclass,
           createdBy: user,
         } as DeepPartial<Question>);
@@ -117,6 +118,7 @@ export class QuestionsService {
     pageOptions: PageOptionsDto,
     query: Partial<Question> & { createdById?: number },
     user: User,
+    req
   ): Promise<PageDto<Question>> {
     // console.log(user)
     if (!user.classes || !user.subjects) {
@@ -191,7 +193,10 @@ export class QuestionsService {
 
     // 📦 Phân trang & sắp xếp
     queryBuilder.orderBy('question.id', order);
-    queryBuilder.skip(skip).take(take);
+    queryBuilder.skip(skip)
+    if ('take' in req.query) {
+      queryBuilder.take(take);
+    }
 
     const itemCount = await queryBuilder.getCount();
     const items = await queryBuilder.getMany();
@@ -206,7 +211,6 @@ export class QuestionsService {
     const pageMetaDto = new PageMetaDto({ pageOptionsDto: pageOptions, itemCount });
     return new PageDto(items, pageMetaDto);
   }
-
   async findOne(id: number): Promise<ItemDto<Question>> {
 
     const question = await this.questionRepo.findOne({
@@ -216,6 +220,7 @@ export class QuestionsService {
         'topic',
         'level',
         'class',
+        'answers',
         'typeQuestion',
         'multipleChoice',
         'createdBy',
@@ -236,7 +241,7 @@ export class QuestionsService {
   }
   async update(id: number, updateDto: UpdateQuestionDto, user: User) {
     // console.log(id, user)
-    console.log(id)
+    // console.log(updateDto)
     const question = await this.questionRepo.findOne({
       where: { id },
       relations: ['createdBy', 'subject', 'topic', 'level', 'class', 'answers'],
@@ -258,7 +263,7 @@ export class QuestionsService {
       classId,
       answers,
     } = updateDto;
-
+    // console.log(answers)
     if (content !== undefined) question.content = content;
 
     if (subjectId !== undefined) {
@@ -296,20 +301,53 @@ export class QuestionsService {
       if (!classEntity) throw new NotFoundException('Class không tồn tại');
       question.class = classEntity;
     }
-    // ✅ Cập nhật từng answer theo ID
+    // Cập nhật từng answer theo ID
     if (answers && Array.isArray(answers)) {
-      // console.log(answers)
-      question.answers.sort((a, b) => a.id - b.id);
-      for (let i = 0; i < answers.length; i++) {
-        const a = answers[i] as any
-        const answer = question.answers[i]
-        // console.log(a, answer)
-        const updated = this.answerRepo.merge(answer, {
-          content: a.content,
-          isCorrect: a.isCorrect,
-        });
-        await this.answerRepo.update(answer.id, updated);
+      const keepAnswerIds = answers
+        .filter(a => 'answerId' in a)
+        .map(a => a.answerId);
+
+      const existingAnswerIds = question.answers.map(a => a.id);
+      const toDeleteIds = existingAnswerIds.filter(id => !keepAnswerIds.includes(id));
+
+      if (toDeleteIds.length > 0) {
+        await this.answerRepo.delete(toDeleteIds);
+        question.answers = question.answers.filter(a => !toDeleteIds.includes(a.id));
       }
+
+      const newAnswers: Answer[] = [];
+
+      for (const a of answers) {
+        // console.log(a)
+        const answerId = (a as any).answerId;
+        if (answerId) {
+          const existingAnswer = question.answers.find(ans => ans.id === answerId);
+          if (existingAnswer) {
+            this.answerRepo.merge(existingAnswer, {
+              content: a.content,
+              isCorrect: a.isCorrect,
+            });
+            await this.answerRepo.save(existingAnswer);
+          }
+        } else {
+          const newAnswer = await this.answerService.create({
+            content: a.content,
+            isCorrect: a.isCorrect,
+            questionId: question.id,
+            createdBy: user,
+          }, user);
+
+          if (newAnswer) {
+            newAnswers.push(newAnswer);
+          }
+        }
+      }
+
+      // Gán lại mảng answers đầy đủ (bao gồm cũ + mới)
+      question.answers = [
+        ...(question.answers?.filter(a => keepAnswerIds.includes(a.id)) || []),
+        ...newAnswers,
+      ];
     }
     const updated = await this.questionRepo.save(question);
     return new ItemDto(updated);

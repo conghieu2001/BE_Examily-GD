@@ -51,7 +51,8 @@ import { AnswerCloneModule } from './answer-clone/answer-clone.module';
         password: configService.get<string>('DB_PASSWORD') ?? process.env.DB_PASSWORD,
         database: configService.get<string>('DB_DATABASE') ?? process.env.DB_DATABASE,
         autoLoadEntities: true,
-        synchronize: true, // ❗️Không bật ở môi trường production
+        synchronize: true,
+        // migrationsRun: true,
       }),
       inject: [ConfigService],
     }),
@@ -68,7 +69,7 @@ import { AnswerCloneModule } from './answer-clone/answer-clone.module';
     LevelsModule,
     MultipeChoiceModule,
     SubjectsModule,
-    TopicsModule, 
+    TopicsModule,
     AnswersModule, TypeQuestionsModule, CourseByExamsModule, ExamSessionModule, QuestionScoreModule, SubmitAnswerModule, QuestionCloneModule, AnswerCloneModule,
   ],
   controllers: [],
@@ -79,4 +80,4 @@ import { AnswerCloneModule } from './answer-clone/answer-clone.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

@@ -33,7 +33,7 @@ export class CreateExamDto extends OmitType(BaseDto, [] as const) {
   @IsNotEmpty()
   title: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
   description?: string;
@@ -63,11 +63,6 @@ export class CreateExamDto extends OmitType(BaseDto, [] as const) {
   @IsNumber()
   totalEssayScore: number;
 
-  // @ApiProperty({ type: [Number], required: false })
-  // @IsOptional()
-  // @IsArray()
-  // @IsInt({ each: true })
-  // questionIds?: number[];
   @ApiProperty({ type: [CreateQuestionCloneDto], required: false })
   @IsOptional()
   @IsArray()

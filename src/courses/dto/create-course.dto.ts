@@ -10,12 +10,12 @@ export class CreateCourseDto extends OmitType(BaseDto, [] as const) {
     @IsString()
     description: string
 
-    @ApiProperty()
-    @IsBoolean()
-    isLocked: boolean;
+    // @ApiProperty()
+    // @IsBoolean()
+    // isLocked: boolean;
 
-    @ApiProperty({ required: false })
-    @ValidateIf(o => o.isLocked === true)
+    @ApiProperty()
+    // @ValidateIf(o => o.isLocked === true)
     @IsString()
     @IsNotEmpty()
     password?: string;
