@@ -1,9 +1,10 @@
 import { title } from "process";
 import { BaseWithCreatedBy } from "src/common/entities/base-user-createdBy";
 import { Course } from "src/courses/entities/course.entity";
+import { ExamSession } from "src/exam-session/entities/exam-session.entity";
 import { Exam } from "src/exams/entities/exam.entity";
 import { User } from "src/users/entities/user.entity";
-import { Column, Entity, JoinColumn, JoinTable, ManyToMany, ManyToOne } from "typeorm";
+import { Column, Entity, JoinColumn, JoinTable, ManyToMany, ManyToOne, OneToMany } from "typeorm";
 
 
 export enum statusExam {
@@ -16,8 +17,8 @@ export enum statusExam {
 export class CourseByExam extends BaseWithCreatedBy {
     @Column()
     title: string
-    @Column({ default: false })
-    isLocked: boolean;
+    // @Column({ default: false })
+    // isLocked: boolean;
 
     @Column({ nullable: true })
     password?: string;
@@ -50,4 +51,7 @@ export class CourseByExam extends BaseWithCreatedBy {
         default: statusExam.NOTSTARTED,
     })
     status: statusExam;
+
+    @OneToMany(() => ExamSession, es => es.courseByExam)
+    examSessions: ExamSession[];
 }

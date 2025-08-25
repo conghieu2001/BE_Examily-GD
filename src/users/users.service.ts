@@ -3,7 +3,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { isEmail } from 'class-validator';
 import { UserUtil } from 'src/common/bryct/config.bryct';
 import { ChangePassDto } from './dto/change-pass-dto';
@@ -12,32 +12,64 @@ import { ItemDto, PageDto } from 'src/common/paginations/dtos/page.dto';
 import { PageMetaDto } from 'src/common/paginations/dtos/page.metadata.dto';
 import { Role } from 'src/roles/role.enum';
 import { paginationKeyword } from 'src/utils/keywork-pagination';
+import { Class } from 'src/classes/entities/class.entity';
+import { Subject } from 'src/subjects/entities/subject.entity';
 
 @Injectable()
 export class UsersService {
   constructor(
-    @InjectRepository(User) private userRepo: Repository<User>
+    @InjectRepository(User) private userRepo: Repository<User>,
+    @InjectRepository(Class) private classRepo: Repository<Class>,
+    @InjectRepository(Subject) private subjectRepo: Repository<Subject>,
   ) { }
-  async create(createUserDto: CreateUserDto, user: User) {
-    const { fullName, username, password, role = Role.STUDENT, isAdmin } = createUserDto;
-
-    const exitsUser: User | null = await this.userRepo.findOne({ where: { username: username } });
-
-    if (exitsUser) {
-      throw new BadRequestException('Username đã được sử dụng')
-    }
-    const userCreate = await this.userRepo.save({
+  async create(createUserDto: CreateUserDto, createdByUser: User): Promise<User> {
+    const {
       fullName,
       username,
-      password: UserUtil.hashPassword(password.toString()),
-      role: user.role === Role.ADMIN ? role : Role.STUDENT, // Chỉ admin mới có thể tạo user với role khác
-      isAdmin: isAdmin ?? false,
-      avatar: '/public/default/default-user.jpg',
-      createdBy: user, // Lưu ID của người tạo
-    });
-    return userCreate;
-  }
+      password,
+      role = Role.STUDENT,
+      isAdmin,
+      classIds = [],
+      subjectIds = [],
+    } = createUserDto;
 
+    // Kiểm tra trùng username
+    const existingUser = await this.userRepo.findOne({ where: { username } });
+    if (existingUser) {
+      throw new BadRequestException('Username đã được sử dụng');
+    }
+
+    // Băm mật khẩu
+    const hashedPassword = UserUtil.hashPassword(password.toString());
+
+    // Phân quyền: chỉ admin mới có quyền set role khác hoặc gán isAdmin
+    const assignedRole = createdByUser.role === Role.ADMIN ? role : Role.STUDENT;
+    const assignedIsAdmin = createdByUser.role === Role.ADMIN ? (isAdmin ?? false) : false;
+
+    // Lấy các lớp & môn học nếu có
+    const classes = classIds.length
+      ? await this.classRepo.findBy({ id: In(classIds) })
+      : [];
+
+    const subjects = subjectIds.length
+      ? await this.subjectRepo.findBy({ id: In(subjectIds) })
+      : [];
+
+    //Tạo user
+    const newUser = this.userRepo.create({
+      fullName,
+      username,
+      password: hashedPassword,
+      role: assignedRole,
+      isAdmin: assignedIsAdmin,
+      avatar: '/public/default/default-user.jpg',
+      createdBy: createdByUser,
+      classes,
+      subjects,
+    });
+
+    return this.userRepo.save(newUser);
+  }
 
   async changePassword(id: number, dto: ChangePassDto, user: User): Promise<Partial<User>> {
     const { password, newPassword } = dto;
@@ -67,9 +99,11 @@ export class UsersService {
     };
   }
 
-
   async findAll(pageOptions: PageOptionsDto, query: Partial<User>, user): Promise<PageDto<User>> {
-    const queryBuilder = this.userRepo.createQueryBuilder('user').leftJoin('user.createdBy', 'createdBy') // 👈 không dùng leftJoinAndSelect
+    const queryBuilder = this.userRepo.createQueryBuilder('user')
+      .leftJoinAndSelect('user.classes', 'classes')
+      .leftJoinAndSelect('user.subjects', 'subjects')
+      .leftJoin('user.createdBy', 'createdBy')
       .addSelect([
         'createdBy.fullName',
       ])
@@ -109,10 +143,10 @@ export class UsersService {
     return new PageDto(items, pageMetaDto);
   }
 
-
   async findOne(id: number): Promise<ItemDto<User>> {
     const user = await this.userRepo.findOne({
       where: { id },
+      relations: ['classes', 'subjects', 'createdBy'],
     });
 
     if (!user) {
@@ -121,8 +155,6 @@ export class UsersService {
 
     return new ItemDto(user);
   }
-
-
 
   async blockUser(id: number, currentUser: User): Promise<User> {
     const targetUser = await this.userRepo.findOne({ where: { id }, relations: ['createdBy'] });
@@ -133,7 +165,7 @@ export class UsersService {
 
     const isTargetAdmin = targetUser.role === Role.ADMIN;
     const isTargetTeacher = targetUser.role === Role.TEACHER;
-    const isCurrentAdmin = currentUser.role === Role.ADMIN;                                                                                                            
+    const isCurrentAdmin = currentUser.role === Role.ADMIN;
 
     if (isTargetAdmin) {
       throw new BadRequestException(`Bạn không có quyền chặn người dùng này`);
@@ -148,7 +180,6 @@ export class UsersService {
 
     return targetUser;
   }
-
 
   async unblockUser(id: number, currentUser: User): Promise<User> {
     const targetUser = await this.userRepo.findOne({ where: { id }, relations: ['createdBy'] });
@@ -175,7 +206,6 @@ export class UsersService {
     return targetUser;
   }
 
-
   async resetPassword(id: number, user: User): Promise<User> {
     const targetUser = await this.userRepo.findOne({ where: { id }, relations: ['createdBy'] });
 
@@ -194,7 +224,7 @@ export class UsersService {
   }
 
   async updateUser(id: number, data: UpdateUserDto): Promise<User> {
-    const user = await this.userRepo.findOne({ where: { id } });
+    const user = await this.userRepo.findOne({ where: { id }, relations: ['classes', 'subjects'], });
 
     if (!user) {
       throw new NotFoundException(`Không tìm thấy người dùng với ID: ${id}`);
@@ -202,6 +232,17 @@ export class UsersService {
 
     user.fullName = data.fullName ?? user.fullName;
     user.username = data.username ?? user.username;
+    // Cập nhật lớp nếu có classIds
+    if (data.classIds && Array.isArray(data.classIds)) {
+      const classEntities = await this.classRepo.findBy({ id: In(data.classIds) });
+      user.classes = classEntities;
+    }
+
+    // Cập nhật môn nếu có subjectIds
+    if (data.subjectIds && Array.isArray(data.subjectIds)) {
+      const subjectEntities = await this.subjectRepo.findBy({ id: In(data.subjectIds) });
+      user.subjects = subjectEntities;
+    }
 
     await this.userRepo.save(user);
 

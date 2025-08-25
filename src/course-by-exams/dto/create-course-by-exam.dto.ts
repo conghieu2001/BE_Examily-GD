@@ -16,9 +16,13 @@ export class CreateCourseByExamDto extends OmitType(BaseDto, [] as const) {
     @IsInt()
     courseId: number;
 
-    @ApiProperty()
-    @IsBoolean()
-    isLocked: boolean;
+    // @ApiProperty({default: 0})
+    // @IsInt()
+    // joincount: number;
+
+    // @ApiProperty()
+    // @IsBoolean()
+    // isLocked: boolean;
 
     @ApiProperty({ required: false })
     @ValidateIf(o => o.isLocked)

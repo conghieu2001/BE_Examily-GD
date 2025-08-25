@@ -1,5 +1,5 @@
 import { ApiProperty, OmitType } from "@nestjs/swagger";
-import { IsBoolean, IsNotEmpty, IsString, ValidateIf } from "class-validator";
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, ValidateIf } from "class-validator";
 import { BaseDto } from "src/common/dto/base.dto";
 
 export class CreateCourseDto extends OmitType(BaseDto, [] as const) {
@@ -10,13 +10,14 @@ export class CreateCourseDto extends OmitType(BaseDto, [] as const) {
     @IsString()
     description: string
 
-    @ApiProperty()
-    @IsBoolean()
-    isLocked: boolean;
+    // @ApiProperty()
+    // @IsBoolean()
+    // isLocked: boolean;
 
-    @ApiProperty({ required: false })
-    @ValidateIf(o => o.isLocked === true)
+    @ApiProperty()
+    // @ValidateIf(o => o.isLocked === true)
+    @IsOptional()
     @IsString()
-    @IsNotEmpty()
+    // @IsNotEmpty()
     password?: string;
 }

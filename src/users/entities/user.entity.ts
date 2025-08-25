@@ -1,8 +1,10 @@
+import { Class } from "src/classes/entities/class.entity";
 import { BaseWithCreatedBy } from "src/common/entities/base-user-createdBy";
 import { CourseByExam } from "src/course-by-exams/entities/course-by-exam.entity";
 import { Course } from "src/courses/entities/course.entity";
 import { Role } from "src/roles/role.enum";
-import { Column, Entity, ManyToMany, OneToMany } from "typeorm";
+import { Subject } from "src/subjects/entities/subject.entity";
+import { Column, Entity, JoinTable, ManyToMany, OneToMany } from "typeorm";
 
 
 @Entity()
@@ -28,6 +30,11 @@ export class User extends BaseWithCreatedBy {
     @ManyToMany(() => CourseByExam, courseByExam => courseByExam.students)
     joinedCourseByExams: CourseByExam[];
 
-    // @ManyToMany(() => Course, course => course.users)
-    // joinedCourses: Course[];
+    @ManyToMany(() => Class, classEntity => classEntity.users, { cascade: true })
+    @JoinTable()
+    classes: Class[];
+
+    @ManyToMany(() => Subject, subject => subject.users, { cascade: true })
+    @JoinTable()
+    subjects: Subject[];
 }

@@ -10,7 +10,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     JwtModule.register({
       global: true,
       secret: 'thienthanh132',
-      signOptions: { expiresIn: '60m' },
+      signOptions: { expiresIn: '1h' },
     }),
     UsersModule,
     ConfigModule.forRoot(), // Load biến môi trường từ .env

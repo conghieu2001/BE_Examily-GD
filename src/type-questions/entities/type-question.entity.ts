@@ -5,4 +5,5 @@ import { Column, Entity } from "typeorm";
 export class TypeQuestion extends BaseEntity{
     @Column()
     name: string
+  static ESSAY: TypeQuestion;
 }

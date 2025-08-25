@@ -8,6 +8,7 @@ import { ErrorsInterceptor } from './common/interceptors/errors.interceptor';
 import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import * as bodyParser from 'body-parser';
 
 // 🔥 Thêm các import để dùng NestExpressApplication và path
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -21,6 +22,9 @@ async function bootstrap() {
   app.useStaticAssets(path.join(__dirname, '..', 'public'), {
     prefix: '/api/public/',
   });
+  // 👉 Thêm dòng này để tăng giới hạn request size
+  app.use(bodyParser.json({ limit: '50mb' }));
+  app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
   // Global filters & interceptors
   app.useGlobalFilters(new HttpExceptionFilter());

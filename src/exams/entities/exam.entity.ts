@@ -10,6 +10,10 @@ import {
 import { BaseWithCreatedBy } from 'src/common/entities/base-user-createdBy';
 import { Course } from 'src/courses/entities/course.entity';
 import { Question } from 'src/questions/entities/question.entity';
+import { Subject } from 'src/subjects/entities/subject.entity';
+import { Class } from 'src/classes/entities/class.entity';
+import { QuestionScore } from 'src/question-score/entities/question-score.entity';
+import { QuestionClone } from 'src/question-clone/entities/question-clone.entity';
 
 @Entity()
 export class Exam extends BaseWithCreatedBy {
@@ -22,22 +26,41 @@ export class Exam extends BaseWithCreatedBy {
   @Column({ name: 'duration_minutes', type: 'int' })
   durationMinutes: number;
 
-  @Column()
+  @Column({ type: 'float', nullable: true })
   totalMultipleChoiceScore: number;
-  @Column({ nullable: true })
+  @Column({ type: 'float', nullable: true })
   totalMultipleChoiceScorePartI: number;
-  @Column({ nullable: true })
+  @Column({ type: 'float', nullable: true })
   totalMultipleChoiceScorePartII: number;
-  @Column({ nullable: true })
+  @Column({ type: 'float', nullable: true })
   totalMultipleChoiceScorePartIII: number;
-  @Column()
+  @Column({ type: 'float', nullable: true, })
   totalEssayScore: number;
-
-  // @ManyToOne(() => Course, course => course.exams, { nullable: false, onDelete: 'CASCADE' })
-  // @JoinColumn({ name: 'course_id' })
-  // course: Course;
 
   @ManyToMany(() => Question, question => question.exams)
   @JoinTable()
   questions: Question[];
+
+  @ManyToMany(() => QuestionClone, q => q.exams, {
+    // cascade: false,
+    onDelete: 'CASCADE',
+  })
+  @JoinTable()
+  questionclones: QuestionClone[];
+
+  @ManyToOne(() => Class, cls => cls.exams, { nullable: true })
+  @JoinColumn({ name: 'classId' })
+  class: Class;
+
+  @ManyToOne(() => Subject, subj => subj.exams, { nullable: true })
+  @JoinColumn({ name: 'subjectId' })
+  subject: Subject;
+
+
+  @OneToMany(() => QuestionScore, qs => qs.exam, { cascade: true })
+  // @JoinColumn({ name: 'questionScoreId' })
+  questionScores: QuestionScore[];
+
+  @Column({ default: false })
+  isCourseByExam: boolean
 }

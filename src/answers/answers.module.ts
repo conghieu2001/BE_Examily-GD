@@ -9,7 +9,7 @@ import { QuestionsModule } from 'src/questions/questions.module'; // ✅ import 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Answer, Question]),
-    forwardRef(() => QuestionsModule), // ✅ sử dụng forwardRef
+    forwardRef(() => QuestionsModule),
   ],
   controllers: [AnswersController],
   providers: [AnswersService],

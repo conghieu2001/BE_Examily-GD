@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Req, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req, UseGuards, Query, HttpException, HttpStatus, ParseIntPipe, BadRequestException } from '@nestjs/common';
 import { CoursesService } from './courses.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
@@ -21,6 +21,13 @@ export class CoursesController {
   create(@Body() createCourseDto: CreateCourseDto, @Req() request: Request) {
     const user: User = request['user'] ?? null;
     return this.coursesService.create(createCourseDto, user);
+  }
+
+  @Get('findbycreated')
+  @Roles(Role.TEACHER)
+  getMyCourses(@Query() pageOptionDto: PageOptionsDto, @Query() query: Partial<Course>, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.coursesService.findAllByCreator(user, pageOptionDto, query);
   }
 
   @Get()
@@ -49,14 +56,43 @@ export class CoursesController {
   //   return this.coursesService.removeUserFromCourse(courseId, userId);
   // }
 
-  @Get(':id')
+  @Post('check-password/:id')
   @Public()
-  findOne(@Param('id') id: string) {
-    return this.coursesService.findOne(+id);
+  async checkPassword(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('password') password: string,
+  ) {
+    if (!password) {
+      throw new HttpException('Vui lòng nhập mật khẩu', HttpStatus.BAD_REQUEST);
+    }
+    return await this.coursesService.checkCoursePassword(id, password);
+  }
+
+  @Post('change-password/:id')
+  @Roles(Role.ADMIN && Role.TEACHER)
+  async changePassword(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { oldPassword: string; newPassword: string },
+  ) {
+    const { oldPassword, newPassword } = body;
+
+    if (!oldPassword || !newPassword) {
+      throw new BadRequestException('Vui lòng nhập đủ mật khẩu cũ và mới');
+    }
+
+    await this.coursesService.changeCoursePassword(id, oldPassword, newPassword);
+    return { message: 'Đổi mật khẩu thành công' };
+  }
+
+  @Get(':id')
+  @Roles(Role.ADMIN, Role.TEACHER, Role.STUDENT)
+  findOne(@Param('id') id: string, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.coursesService.findOne(+id, user);
   }
 
   @Patch(':id')
-  @Public()
+  @Roles(Role.ADMIN && Role.TEACHER)
   update(@Param('id') id: string, @Body() updateCourseDto: UpdateCourseDto) {
     return this.coursesService.update(+id, updateCourseDto);
   }

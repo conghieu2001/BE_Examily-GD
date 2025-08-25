@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Req, Query, UseGuards, Put, UseInterceptors, UploadedFile, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req, Query, UseGuards, Put, UseInterceptors, UploadedFile, NotFoundException, BadRequestException, ParseIntPipe } from '@nestjs/common';
 import { QuestionsService } from './questions.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
@@ -55,7 +55,6 @@ export class QuestionsController {
   ) { }
 
   @Post()
-  @Post()
   @Roles(Role.ADMIN && Role.TEACHER)
   create(@Body() createQuestionDto: CreateQuestionDto, @Req() request: Request) {
     const user: User = request['user'] ?? null;
@@ -63,7 +62,7 @@ export class QuestionsController {
   }
 
   @Post('import-excel')
-  @Public()
+  @Roles(Role.ADMIN && Role.TEACHER)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -165,12 +164,18 @@ export class QuestionsController {
     };
   }
 
-
+  @Post('clone/:id')
+  @Roles(Role.ADMIN && Role.TEACHER)
+  async clone(@Param('id') id: number, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.questionsService.cloneQuestion(id, user);
+  }
 
   @Get()
-  @Public()
-  findAll(@Query() pageOptionDto: PageOptionsDto, @Query() query: Partial<Question>) {
-    return this.questionsService.findAll(pageOptionDto, query);
+  @Roles(Role.ADMIN, Role.TEACHER, Role.STUDENT)
+  findAll(@Query() pageOptionDto: PageOptionsDto, @Query() query: Partial<Question>, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.questionsService.findAll(pageOptionDto, query, user,request);
   }
 
   @Get('getbymultipchoice/:id')
@@ -178,6 +183,15 @@ export class QuestionsController {
   async getByType(@Param('id') typeCode: number) {
     return this.questionsService.findByType(typeCode);
   }
+
+  @Patch('toggle-public/:id')
+  @Roles(Role.ADMIN && Role.TEACHER)
+  async togglePublic(
+    @Param('id', ParseIntPipe) id: number, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.questionsService.updateIsPublicToggle(id, user);
+  }
+
   @Get(':id')
   @Public()
   findOne(@Param('id') id: string) {
@@ -185,15 +199,21 @@ export class QuestionsController {
   }
 
   @Patch(':id')
-  @Public()
-  async update(@Param('id') id: string, @Body() updateQuestionDto: UpdateQuestionDto) {
-    console.log('1', updateQuestionDto.answers)
-    return await this.questionsService.update(+id, updateQuestionDto);
+  @Roles(Role.ADMIN && Role.TEACHER)
+  async update(@Param('id') id: string, @Body() updateQuestionDto: UpdateQuestionDto, @Req() request: Request) {
+    // console.log('1', updateQuestionDto.answers)
+    const user: User = request['user'] ?? null;
+    return await this.questionsService.update(+id, updateQuestionDto, user);
   }
 
   @Delete(':id')
-  @Public()
-  remove(@Param('id') id: string) {
-    return this.questionsService.remove(+id);
+  @Roles(Role.ADMIN && Role.TEACHER)
+  remove(@Param('id') id: string, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.questionsService.remove(+id, user);
   }
 }
+function CurrentUser(): (target: QuestionsController, propertyKey: "togglePublic", parameterIndex: 1) => void {
+  throw new Error('Function not implemented.');
+}
+

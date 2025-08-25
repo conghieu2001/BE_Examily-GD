@@ -23,6 +23,11 @@ import { LevelsModule } from './levels/levels.module';
 import { MultipeChoiceModule } from './multipe-choice/multipe-choice.module';
 import { TypeQuestionsModule } from './type-questions/type-questions.module';
 import { CourseByExamsModule } from './course-by-exams/course-by-exams.module';
+import { ExamSessionModule } from './exam-session/exam-session.module';
+import { QuestionScoreModule } from './question-score/question-score.module';
+import { SubmitAnswerModule } from './submit-answer/submit-answer.module';
+import { QuestionCloneModule } from './question-clone/question-clone.module';
+import { AnswerCloneModule } from './answer-clone/answer-clone.module';
 
 @Module({
   imports: [
@@ -46,7 +51,8 @@ import { CourseByExamsModule } from './course-by-exams/course-by-exams.module';
         password: configService.get<string>('DB_PASSWORD') ?? process.env.DB_PASSWORD,
         database: configService.get<string>('DB_DATABASE') ?? process.env.DB_DATABASE,
         autoLoadEntities: true,
-        synchronize: true, // ❗️Không bật ở môi trường production
+        synchronize: true,
+        // migrationsRun: true,
       }),
       inject: [ConfigService],
     }),
@@ -63,8 +69,8 @@ import { CourseByExamsModule } from './course-by-exams/course-by-exams.module';
     LevelsModule,
     MultipeChoiceModule,
     SubjectsModule,
-    TopicsModule, 
-    AnswersModule, TypeQuestionsModule, CourseByExamsModule,
+    TopicsModule,
+    AnswersModule, TypeQuestionsModule, CourseByExamsModule, ExamSessionModule, QuestionScoreModule, SubmitAnswerModule, QuestionCloneModule, AnswerCloneModule,
   ],
   controllers: [],
   providers: [
@@ -74,4 +80,4 @@ import { CourseByExamsModule } from './course-by-exams/course-by-exams.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

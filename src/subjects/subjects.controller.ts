@@ -15,7 +15,6 @@ export class SubjectsController {
   create(@Body() createSubjectDto: CreateSubjectDto) {
     return this.subjectsService.create(createSubjectDto);
   }
-
   @Get()
   @Public()
   findAll(

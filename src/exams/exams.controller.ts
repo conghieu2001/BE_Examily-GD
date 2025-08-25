@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Req, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req, Query, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { ExamsService } from './exams.service';
 import { CreateExamDto } from './dto/create-exam.dto';
 import { UpdateExamDto } from './dto/update-exam.dto';
@@ -21,19 +21,28 @@ export class ExamsController {
     const user: User = request['user'] ?? null;
     return this.examsService.create(createExamDto, user);
   }
-
+  @Get('origins')
+  @Roles(Role.ADMIN && Role.TEACHER)
+  findAllByExamReal(@Query() pageOptionDto: PageOptionsDto, @Query() query: Partial<Exam>, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.examsService.findAllExamReal(pageOptionDto, query, user,request);
+  }
   @Get()
-  @Public()
-  findAll(@Query() pageOptionDto: PageOptionsDto, @Query() query: Partial<Exam>) {
-    return this.examsService.findAll(pageOptionDto, query);
+  @Roles(Role.ADMIN && Role.TEACHER)
+  findAll(@Query() pageOptionDto: PageOptionsDto, @Query() query: Partial<Exam>, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.examsService.findAll(pageOptionDto, query, user,request);
   }
-
-  @Get(':id')
-  @Public()
-  findOne(@Param('id') id: string) {
-    return this.examsService.findOne(+id);
+  
+  @Patch('toggle-public/:id')
+  @Roles(Role.ADMIN && Role.TEACHER)
+  async toggleIsPublic(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: Request
+  ) {
+    const user: User = request['user'] ?? null;
+    return this.examsService.toggleIsPublic(id, user);
   }
-
   @Post('clone/:id')
   @Roles(Role.ADMIN && Role.TEACHER)
   async cloneExam(
@@ -43,11 +52,25 @@ export class ExamsController {
     const user = req['user'];
     return await this.examsService.clone(+id, user);
   }
+  @Get(':id')
+  @Roles(Role.ADMIN && Role.TEACHER)
+  findOne(@Param('id') id: string, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.examsService.findOne(+id, user);
+  }
 
   @Patch(':id')
-  @Public()
-  update(@Param('id') id: string, @Body() updateExamDto: UpdateExamDto) {
-    return this.examsService.update(+id, updateExamDto);
+  @Roles( Role.TEACHER)
+  // @Public()
+  update(
+    @Param('id') id: string,
+    @Body() rawBody: any, // KHÔNG dùng DTO ở đây
+    @Req() request: Request
+  ) {
+    const user: User = request['user'] ?? null;
+    const rawQuestionClones = rawBody.questionClones ?? [];
+    // console.log(rawQuestionClones)
+    return this.examsService.update(+id, rawBody, user, rawQuestionClones);
   }
 
   @Delete(':id')
