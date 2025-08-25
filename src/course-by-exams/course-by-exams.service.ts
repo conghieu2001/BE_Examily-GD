@@ -15,6 +15,7 @@ import { JoinCourseByExamDto } from './dto/join-course.dto';
 import { ExamSession } from 'src/exam-session/entities/exam-session.entity';
 import { QuestionClone } from 'src/question-clone/entities/question-clone.entity';
 import { ExamsService } from 'src/exams/exams.service';
+import { TypeQuestion } from 'src/type-questions/entities/type-question.entity';
 
 @Injectable()
 export class CourseByExamsService {
@@ -36,7 +37,13 @@ export class CourseByExamsService {
     if (!course) {
       throw new NotFoundException(`Không tìm thấy khóa học với ID: ${courseId}`);
     }
-    const createExamClone = await this.examService.cloneByExanOrigin(examId, title, user)
+    // console.log(1)
+    const createExamClone = await this.examService.cloneByExanOrigin(examId, title, user);
+    // console.log(typeof(createExamClone))
+    if (!createExamClone) {
+      throw new NotFoundException('Không thể clone đề thi');
+    }
+
     const now = new Date();
     let computedStatus: statusExam = statusExam.NOTSTARTED;
 
@@ -303,11 +310,10 @@ export class CourseByExamsService {
     }
     // Nếu là giáo viên (người tạo)
     // console.log(courseByExam.createdBy)
+    // console.log(courseByExam.createdBy?.id, user.id)
     if (user && Number(courseByExam.createdBy?.id) === Number(user.id)) {
-      console.log(courseByExam)
-      return {
-        courseByExam,
-      };
+      // console.log('111111')
+      return { courseByExam };
     }
     // Kiểm tra mật khẩu nếu có
     if (courseByExam.password !== null) {
@@ -365,10 +371,34 @@ export class CourseByExamsService {
       },
       relations: []
     });
-
     if (!examSession) {
-      const questionIds = courseByExam.exam.questionclones.map(q => q.id);
-      const shuffled = questionIds.sort(() => Math.random() - 0.5);
+      // Gom nhóm câu hỏi theo typeQuestion + multipleChoice
+      const grouped: Record<string, number[]> = {};
+      for (const q of courseByExam.exam.questionclones) {
+        const typeKey = q.typeQuestion?.name === 'multiple_choice' ? 'MC' : 'ESSAY';
+
+        const partKey = q.multipleChoice?.name || 'Khác';
+        const key = `${typeKey}_${partKey}`;
+
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(q.id);
+      }
+
+      // Thứ tự sắp xếp
+      const typeOrder = ['MC', 'ESSAY'];
+      const partOrder = ['Phần I', 'Phần II', 'Phần III', 'Khác'];
+
+      const shuffled: number[] = [];
+      for (const type of typeOrder) {
+        for (const part of partOrder) {
+          const key = `${type}_${part}`;
+          if (grouped[key]) {
+            // Random trong từng phần
+            const partShuffled = grouped[key].sort(() => Math.random() - 0.5);
+            shuffled.push(...partShuffled);
+          }
+        }
+      }
 
       examSession = this.examSessionRepo.create({
         courseByExam,
@@ -376,11 +406,28 @@ export class CourseByExamsService {
         startedAt: now,
         isSubmitted: false,
         questionOrder: shuffled,
-        createdBy: user
+        createdBy: user,
       });
 
       await this.examSessionRepo.save(examSession);
     }
+
+
+    // if (!examSession) {
+    //   const questionIds = courseByExam.exam.questionclones.map(q => q.id);
+    //   const shuffled = questionIds.sort(() => Math.random() - 0.5);
+
+    //   examSession = this.examSessionRepo.create({
+    //     courseByExam,
+    //     exam: courseByExam.exam,
+    //     startedAt: now,
+    //     isSubmitted: false,
+    //     questionOrder: shuffled,
+    //     createdBy: user
+    //   });
+
+    //   await this.examSessionRepo.save(examSession);
+    // }
     const questionMap = new Map<number, QuestionClone>();
     for (const question of courseByExam.exam.questionclones) {
       questionMap.set(question.id, question);

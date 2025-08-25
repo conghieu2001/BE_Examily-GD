@@ -26,22 +26,25 @@ export class Exam extends BaseWithCreatedBy {
   @Column({ name: 'duration_minutes', type: 'int' })
   durationMinutes: number;
 
-  @Column({type: 'float', nullable: true })
+  @Column({ type: 'float', nullable: true })
   totalMultipleChoiceScore: number;
-  @Column({type: 'float', nullable: true })
+  @Column({ type: 'float', nullable: true })
   totalMultipleChoiceScorePartI: number;
-  @Column({type: 'float', nullable: true })
+  @Column({ type: 'float', nullable: true })
   totalMultipleChoiceScorePartII: number;
-  @Column({type: 'float', nullable: true })
+  @Column({ type: 'float', nullable: true })
   totalMultipleChoiceScorePartIII: number;
-  @Column({type: 'float', nullable: true,})
+  @Column({ type: 'float', nullable: true, })
   totalEssayScore: number;
 
   @ManyToMany(() => Question, question => question.exams)
   @JoinTable()
   questions: Question[];
 
-  @ManyToMany(() => QuestionClone, question => question.exams)
+  @ManyToMany(() => QuestionClone, q => q.exams, {
+    // cascade: false,
+    onDelete: 'CASCADE',
+  })
   @JoinTable()
   questionclones: QuestionClone[];
 
@@ -58,6 +61,6 @@ export class Exam extends BaseWithCreatedBy {
   // @JoinColumn({ name: 'questionScoreId' })
   questionScores: QuestionScore[];
 
-  @Column({default: false})
+  @Column({ default: false })
   isCourseByExam: boolean
 }

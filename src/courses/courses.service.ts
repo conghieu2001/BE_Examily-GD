@@ -28,29 +28,20 @@ export class CoursesService {
       throw new HttpException('Tên khóa học đã tồn tại', 409);
     }
 
-    // Nếu khóa thì bắt buộc có mật khẩu
-    // if (!password) {
-    //   throw new BadRequestException('Khóa học bị khóa phải có mật khẩu');
-    // }
-
-    // // Mã hóa mật khẩu nếu cần
-    // let hashedPassword: string | undefined;
-    // if (isLocked && password) {
-    // const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, 10);
-    // }
+    let hashedPassword: string | undefined;
+    if (password) {
+      hashedPassword = await bcrypt.hash(password, 10);
+    }
 
     const newCourse = this.courseRepo.create({
       name,
       description,
-      // isLocked,
-      password: hashedPassword, // chỉ là string hoặc undefined
+      password: hashedPassword, // nếu không truyền sẽ là undefined
       createdBy: user,
     });
 
     return await this.courseRepo.save(newCourse);
   }
-
   async findAll(pageOptions: PageOptionsDto, query: Partial<Course> & { createdById?: number },): Promise<PageDto<Course>> {
     const queryBuilder = this.courseRepo.createQueryBuilder('course')
       .leftJoinAndSelect('course.createdBy', 'createdBy')
@@ -136,67 +127,139 @@ export class CoursesService {
 
     return new PageDto(items, pageMetaDto);
   }
+  // async findOne(id: number, user: User): Promise<ItemDto<Course>> {
+  //   const course = await this.courseRepo.findOne({
+  //     where: { id },
+  //     relations: [
+  //       'createdBy',
+  //       'createdBy.classes',
+  //       'createdBy.subjects',
+  //       'courseByExams',
+  //       'courseByExams.createdBy',
+  //       'courseByExams.exam',
+  //       'courseByExams.exam.class',
+  //       'courseByExams.exam.subject',
+  //       'courseByExams.students',
+  //     ],
+  //   });
 
-  async findOne(id: number, user: User): Promise<ItemDto<Course>> {
-    // console.log(user)
-    const course = await this.courseRepo.findOne({
-      where: { id },
-      relations: [
-        'createdBy',
-        'createdBy.classes',
-        'createdBy.subjects',
-        'courseByExams',
-        'courseByExams.createdBy',
-        'courseByExams.exam',
-        'courseByExams.exam.class',
-        'courseByExams.exam.subject',
-        'courseByExams.students',
-      ],
-    });
+  //   if (!course) {
+  //     throw new NotFoundException(`Không tìm thấy khóa học với ID: ${id}`);
+  //   }
+
+  //   const now = new Date();
+
+  //   // --- Lấy danh sách courseByExamId đã có exam_session ---
+  //   const takenList = await this.courseByExamRepo
+  //     .createQueryBuilder('cbx')
+  //     .select('cbx.id', 'courseByExamId')
+  //     .addSelect('COUNT(es.id)', 'sessionCount')
+  //     .leftJoin('exam_session', 'es', 'es."courseByExamId" = cbx.id')
+  //     .where('cbx.courseId = :courseId', { courseId: id })
+  //     .groupBy('cbx.id')
+  //     .getRawMany();
+
+  //   const takenMap = new Map<number, boolean>();
+  //   takenList.forEach(row => {
+  //     takenMap.set(Number(row.courseByExamId), Number(row.sessionCount) > 0);
+  //   });
+
+  //   // --- Cập nhật status và isTaken ---
+  //   if (course.courseByExams) {
+  //     for (let i = 0; i < course.courseByExams.length; i++) {
+  //       const courseByExam = course.courseByExams[i];
+
+  //       // Gán trạng thái isTaken
+  //       courseByExam['isSubmit'] = takenMap.get(courseByExam.id) || false;
+
+  //       // Gán status theo thời gian
+  //       if (courseByExam.availableFrom && courseByExam.availableTo) {
+  //         if (now < courseByExam.availableFrom) {
+  //           courseByExam.status = statusExam.NOTSTARTED;
+  //         } else if (now >= courseByExam.availableFrom && now <= courseByExam.availableTo) {
+  //           courseByExam.status = statusExam.ONGOING;
+  //         } else if (now > courseByExam.availableTo) {
+  //           courseByExam.status = statusExam.ENDED;
+  //         }
+  //         await this.courseByExamRepo.save(courseByExam);
+  //       }
+  //     }
+  //   }
+
+  //   // --- Sắp xếp ---
+  //   course.courseByExams.sort((a, b) => a.id - b.id);
+
+  //   // --- Phân quyền ---
+  //   if (user?.role === Role.STUDENT) {
+  //     course.courseByExams = course.courseByExams.filter(cb => !cb.isPublic);
+  //   } else if (user?.role === Role.TEACHER) {
+  //     const isOwner = course.createdBy?.id === user.id;
+  //     if (!isOwner) {
+  //       course.courseByExams = course.courseByExams.filter(cb => !cb.isPublic);
+  //     }
+  //   } else if (user?.role === Role.ADMIN) {
+  //     // Admin giữ nguyên
+  //   } else {
+  //     course.courseByExams = [];
+  //   }
+
+  //   return new ItemDto(course);
+  // }
+  // 
+
+    async findOne(id: number, user: User): Promise<ItemDto<Course>> {
+    const course = await this.courseRepo
+      .createQueryBuilder('course')
+      .leftJoinAndSelect('course.createdBy', 'createdBy')
+      .leftJoinAndSelect('createdBy.classes', 'createdByClasses')
+      .leftJoinAndSelect('createdBy.subjects', 'createdBySubjects')
+      .leftJoinAndSelect('course.courseByExams', 'courseByExams')
+      .leftJoinAndSelect('courseByExams.createdBy', 'cbxCreatedBy')
+      .leftJoinAndSelect('courseByExams.exam', 'exam')
+      .leftJoinAndSelect('exam.class', 'examClass')
+      .leftJoinAndSelect('exam.subject', 'examSubject')
+      .leftJoinAndSelect('courseByExams.students', 'students')
+      .leftJoinAndSelect('courseByExams.examSessions', 'examSessions')
+      .leftJoinAndSelect('examSessions.createdBy', 'examSessionUser')
+      .where('course.id = :id', { id })
+      .getOne();
 
     if (!course) {
       throw new NotFoundException(`Không tìm thấy khóa học với ID: ${id}`);
     }
+
     const now = new Date();
-
-    if (course.courseByExams) {
-      for (let i = 0; i < course.courseByExams.length; i++) {
-        const courseByExam = course.courseByExams[i];
-
-        if (courseByExam.availableFrom && courseByExam.availableTo) {
-          if (now < courseByExam.availableFrom) {
-            courseByExam.status = statusExam.NOTSTARTED;
-            await this.courseByExamRepo.save(courseByExam);
-          } else if (now >= courseByExam.availableFrom && now <= courseByExam.availableTo) {
-            courseByExam.status = statusExam.ONGOING;
-            await this.courseByExamRepo.save(courseByExam);
-          } else if (now > courseByExam.availableTo) {
-            courseByExam.status = statusExam.ENDED;
-            await this.courseByExamRepo.save(courseByExam);
-          }
+    for (const courseByExam of course.courseByExams) {
+      if (courseByExam.availableFrom && courseByExam.availableTo) {
+        if (now < courseByExam.availableFrom) {
+          courseByExam.status = statusExam.NOTSTARTED;
+        } else if (now <= courseByExam.availableTo) {
+          courseByExam.status = statusExam.ONGOING;
+        } else {
+          courseByExam.status = statusExam.ENDED;
         }
+        await this.courseByExamRepo.save(courseByExam);
       }
-    }
-    course.courseByExams.sort((a, b) => a.id - b.id);
-    if (user?.role === Role.STUDENT) {
-      // Học sinh chỉ xem được các bài thi không khóa
-      course.courseByExams = course.courseByExams.filter(cb => !cb.isPublic);
 
+      // Lọc examSessions của user hiện tại
+      courseByExam.examSessions = (courseByExam.examSessions ?? []).filter(
+        es => es.createdBy?.id === user?.id
+      );
+    }
+
+    course.courseByExams.sort((a, b) => a.id - b.id);
+
+    if (user?.role === Role.STUDENT) {
+      course.courseByExams = course.courseByExams.filter(cb => !cb.isPublic);
     } else if (user?.role === Role.TEACHER) {
       const isOwner = course.createdBy?.id === user.id;
       if (!isOwner) {
-        // Giáo viên không phải người tạo => chỉ xem bài không khóa
         course.courseByExams = course.courseByExams.filter(cb => !cb.isPublic);
       }
-      // Nếu là người tạo thì giữ nguyên tất cả
-
-    } else if (user?.role === Role.ADMIN) {
-      // Admin được xem tất cả => giữ nguyên courseByExams
-
-    } else {
-      // Không xác định quyền => không được xem gì
+    } else if (user?.role !== Role.ADMIN) {
       course.courseByExams = [];
     }
+
     return new ItemDto(course);
   }
 
@@ -227,7 +290,6 @@ export class CoursesService {
 
     return await this.courseRepo.save(course);
   }
-
   async remove(id: number): Promise<Course> {
     const isClass = await this.courseRepo.findOne({ where: { id } });
     if (!isClass) {
@@ -236,7 +298,6 @@ export class CoursesService {
     await this.courseRepo.softDelete(id); // Sử dụng soft delete
     return isClass; // Trả về dữ liệu trước khi xóa
   }
-
   async checkCoursePassword(courseId: number, password: string): Promise<boolean> {
     const course = await this.courseRepo.findOne({ where: { id: courseId } });
 
@@ -326,4 +387,63 @@ export class CoursesService {
 
   //   return await this.courseRepo.save(course);
   // }
+  // async findOne(id: number, user: User): Promise<ItemDto<Course>> {
+  //   const qb = this.courseRepo
+  //     .createQueryBuilder('course')
+  //     .leftJoinAndSelect('course.createdBy', 'createdBy')
+  //     .leftJoinAndSelect('createdBy.classes', 'createdByClasses')
+  //     .leftJoinAndSelect('createdBy.subjects', 'createdBySubjects')
+  //     .leftJoinAndSelect('course.courseByExams', 'courseByExams')
+  //     .leftJoinAndSelect('courseByExams.createdBy', 'cbxCreatedBy')
+  //     .leftJoinAndSelect('courseByExams.exam', 'exam')
+  //     .leftJoinAndSelect('exam.class', 'examClass')
+  //     .leftJoinAndSelect('exam.subject', 'examSubject')
+
+  //     // chỉ lấy id của students
+  //     .leftJoin('courseByExams.students', 'students')
+  //     .addSelect(['students.id'])
+
+  //     // join examSessions và filter theo user hiện tại
+  //     .leftJoinAndSelect('courseByExams.examSessions', 'examSessions')
+  //     .leftJoin('examSessions.createdBy', 'examSessionUser')
+  //     .andWhere('examSessionUser.id = :userId', { userId: user.id })
+
+  //     .where('course.id = :id', { id });
+
+  //   const course = await qb.getOne();
+
+  //   if (!course) {
+  //     throw new NotFoundException(`Không tìm thấy khóa học với ID: ${id}`);
+  //   }
+
+  //   const now = new Date();
+  //   for (const courseByExam of course.courseByExams) {
+  //     if (courseByExam.availableFrom && courseByExam.availableTo) {
+  //       if (now < courseByExam.availableFrom) {
+  //         courseByExam.status = statusExam.NOTSTARTED;
+  //       } else if (now <= courseByExam.availableTo) {
+  //         courseByExam.status = statusExam.ONGOING;
+  //       } else {
+  //         courseByExam.status = statusExam.ENDED;
+  //       }
+  //       await this.courseByExamRepo.save(courseByExam);
+  //     }
+  //   }
+
+  //   course.courseByExams.sort((a, b) => a.id - b.id);
+
+  //   if (user.role === Role.STUDENT) {
+  //     course.courseByExams = course.courseByExams.filter(cb => !cb.isPublic);
+  //   } else if (user.role === Role.TEACHER) {
+  //     const isOwner = course.createdBy?.id === user.id;
+  //     if (!isOwner) {
+  //       course.courseByExams = course.courseByExams.filter(cb => !cb.isPublic);
+  //     }
+  //   } else if (user.role !== Role.ADMIN) {
+  //     course.courseByExams = [];
+  //   }
+
+  //   return new ItemDto(course);
+  // }
+
 }

@@ -10,6 +10,7 @@ import { SubmitAnswer } from 'src/submit-answer/entities/submit-answer.entity';
 import { Question } from 'src/questions/entities/question.entity';
 import { QuestionClone } from 'src/question-clone/entities/question-clone.entity';
 import { TypeQuestion } from 'src/type-questions/entities/type-question.entity';
+import { error } from 'console';
 
 @Injectable()
 export class ExamSessionService {
@@ -119,10 +120,14 @@ export class ExamSessionService {
         'answers.questionclone.answerclones',
         'courseByExam',
         'courseByExam.exam',
+        'courseByExam.course',
       ],
     });
 
     if (!session) throw new NotFoundException('Không tìm thấy phiên làm bài');
+    // if (session.isSubmitted) {
+    //   throw new BadRequestException('Phiên làm bài đã được nộp trước đó');
+    // }
 
     const now = new Date();
     session.isSubmitted = true;
@@ -135,6 +140,12 @@ export class ExamSessionService {
     let scoreI = 0
     let scoreII = 0
     let scoreIII = 0
+    let totalOriginPartI = 0
+    let totalOriginPartII = 0
+    let totalOriginPartIII = 0
+    let scoreOriginI = 0
+    let scoreOriginII = 0
+    let scoreOriginIII = 0
     for (const answer of session.answers) {
       const question = answer.questionclone;
       const correctAnswers = question?.answerclones || [];
@@ -144,6 +155,8 @@ export class ExamSessionService {
 
       // ================== PHẦN I: Nhiều đáp án ==================
       if (question.multipleChoice.name === 'Phần I') {
+        totalOriginPartI += 1
+        scoreOriginI += question.score
         const selectedIds = (answer.selectedOption || []).slice().sort((a, b) => a - b);
         const correctIds = correctAnswers
           .filter(a => a.isCorrect)
@@ -167,6 +180,8 @@ export class ExamSessionService {
       // ================== PHẦN II: Đúng / Sai từng đáp án ==================
       else if (question.multipleChoice.name === 'Phần II') {
         // console.log(answer.selectedPairs)
+        totalOriginPartII += 1
+        scoreOriginII += question.score
         const studentPairs = answer?.selectedPairs || [];
         // console.log(answer.selectedPairs, '1111')
         let correctCount = 0;
@@ -190,9 +205,18 @@ export class ExamSessionService {
 
       // ================== PHẦN III: So sánh chuỗi ==================
       else if (question.multipleChoice.name === 'Phần III') {
-        // console.log(question)
-        const expected = correctAnswers[0]?.content?.trim().toLowerCase() || '';
-        const studentAnswer = (answer.essayAnswer || '').trim().toLowerCase();
+        totalOriginPartIII += 1;
+        scoreOriginIII += question.score;
+
+        // chuẩn hóa: trim, lowercase, bỏ hết khoảng trắng
+        const expected = (correctAnswers[0]?.content || '')
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, '');
+        const studentAnswer = (answer.essayAnswer || '')
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, '');
 
         const isCorrect = expected === studentAnswer;
 
@@ -200,13 +224,12 @@ export class ExamSessionService {
         answer.pointsAchieved = isCorrect ? score : 0;
 
         if (isCorrect) {
-          questionCountIII++
-          scoreIII += score
+          questionCountIII++;
+          scoreIII += score;
           totalMultipleChoiceScore += score;
         }
       }
     }
-
     // Lưu kết quả tổng
     session.totalMultipleChoiceScore = totalMultipleChoiceScore;
     session.totalScore = totalMultipleChoiceScore
@@ -217,28 +240,36 @@ export class ExamSessionService {
     return {
       success: true,
       submittedAt: now,
-      totalScore: totalMultipleChoiceScore,
+      totalMultipleChoiceScore: totalMultipleChoiceScore,
       totalCorrectPartI: {
         questionCountI,
-        scoreI
+        scoreI,
+        totalOriginPartI,
+        scoreOriginI
       },
       totalCorrectPartII: {
-        scoreII
+        scoreII,
+        totalOriginPartII,
+        scoreOriginII
       },
       totalCorrectPartIII: {
         questionCountIII,
-        scoreIII
+        scoreIII,
+        totalOriginPartIII,
+        scoreOriginIII
       },
+      courseId: session.courseByExam.course.id
     };
   }
 
-  async findOneExamSessionDetail(sessionId: number, user) {
+  async findOneExamSessionDetail(sessionId: number, user: User) {
     const session = await this.examsessionRepo.findOne({
       where: { id: sessionId },
       relations: [
         'createdBy',
         'answers',
         'answers.createdBy',
+        // 'exam',
         'answers.questionclone',
         'answers.questionclone.answerclones',
         'courseByExam',
@@ -250,7 +281,7 @@ export class ExamSessionService {
         },
       },
     });
-
+    // console.log(session, user)
     if (!session) {
       throw new NotFoundException('Không tìm thấy phiên làm bài');
     }
@@ -275,6 +306,10 @@ export class ExamSessionService {
       exam: {
         id: session.courseByExam.exam.id,
         title: session.courseByExam.exam.title,
+        scoreOriginPartI: session.courseByExam.exam.totalMultipleChoiceScorePartI,
+        scoreOriginPartII: session.courseByExam.exam.totalMultipleChoiceScorePartII,
+        scoreOriginPartIII: session.courseByExam.exam.totalMultipleChoiceScorePartIII,
+        scoreOriginEssay: session.courseByExam.exam.totalEssayScore,
       },
       questions: session.answers.map(answer => ({
         questionId: answer.questionclone.id,
@@ -286,7 +321,9 @@ export class ExamSessionService {
         essayAnswer: answer.essayAnswer,
         isCorrect: answer.isCorrect,
         pointsAchieved: answer.pointsAchieved,
+        pointsOrigin: answer.questionclone.score,
         order: answer.order,
+
       })),
     };
 
@@ -298,6 +335,7 @@ export class ExamSessionService {
       relations: [
         'courseByExam',
         'courseByExam.createdBy', // để check GV tạo
+        // 'exam',
         'courseByExam.exam',
         'courseByExam.students',
         'answers',
@@ -332,6 +370,71 @@ export class ExamSessionService {
     // }));
   }
 
+  // async updateExamSessionScore(
+  //   sessionId: number,
+  //   answers: { id: number; pointsAchieved: number }[],
+  //   user: User
+  // ) {
+  //   // Lấy session + courseByExam + createdBy
+  //   const session = await this.examsessionRepo.findOne({
+  //     where: { id: sessionId },
+  //     relations: [
+  //       'courseByExam',
+  //       'courseByExam.createdBy', // để check giáo viên tạo
+  //       'answers',
+  //     ],
+  //   });
+
+  //   if (!session) {
+  //     throw new NotFoundException('Không tìm thấy phiên làm bài');
+  //   }
+
+  //   // Kiểm tra quyền: chỉ giáo viên tạo courseByExam mới được chấm
+  //   if (!session.courseByExam?.createdBy || session.courseByExam.createdBy.id !== user.id) {
+  //     throw new ForbiddenException('Bạn không có quyền chấm bài thi này');
+  //   }
+
+  //   if (!session.isSubmitted) {
+  //     throw new BadRequestException('Bài thi chưa được nộp, không thể chấm điểm');
+  //   }
+
+  //   // Lấy danh sách SubmitAnswer cần update
+  //   const submitAnswers = await this.submitAnswerRepo.find({
+  //     where: {
+  //       session: { id: sessionId },
+  //       id: In(answers.map((a) => a.id)),
+  //     },
+  //   });
+
+  //   if (!submitAnswers.length) {
+  //     throw new NotFoundException('Không tìm thấy câu trả lời cần chấm điểm');
+  //   }
+
+  //   const pointsMap = new Map(answers.map((a) => [a.id, a.pointsAchieved]));
+
+  //   // Update điểm từng câu
+  //   submitAnswers.forEach((ans) => {
+  //     ans.pointsAchieved = pointsMap.get(ans.id) ?? 0;
+  //   });
+
+  //   await this.submitAnswerRepo.save(submitAnswers);
+
+  //   // Tính lại essayScore & totalScore
+  //   session.essayScore = session.answers.reduce(
+  //     (total, a) => total + (a.pointsAchieved || 0),
+  //     0
+  //   );
+  //   session.totalScore =
+  //     (session.totalMultipleChoiceScore || 0) + (session.essayScore || 0);
+
+  //   await this.examsessionRepo.save(session);
+
+  //   return {
+  //     message: 'Cập nhật điểm thành công',
+  //     totalScore: session.totalScore,
+  //     essayScore: session.essayScore,
+  //   };
+  // }
   async updateExamSessionScore(
     sessionId: number,
     answers: { id: number; pointsAchieved: number }[],
@@ -372,29 +475,34 @@ export class ExamSessionService {
       throw new NotFoundException('Không tìm thấy câu trả lời cần chấm điểm');
     }
 
-    const pointsMap = new Map(answers.map((a) => [a.id, a.pointsAchieved]));
-
-    // Update điểm từng câu
-    submitAnswers.forEach((ans) => {
-      ans.pointsAchieved = pointsMap.get(ans.id) ?? 0;
-    });
-
-    await this.submitAnswerRepo.save(submitAnswers);
+    await Promise.all(
+      answers.map((answer) =>
+        this.submitAnswerRepo
+          .createQueryBuilder()
+          .update()
+          .set({ pointsAchieved: (answer.pointsAchieved || 0) })
+          .where("id = :id", { id: answer.id })
+          .execute()
+      )
+    );
 
     // Tính lại essayScore & totalScore
-    session.essayScore = session.answers.reduce(
+    const essayScore = answers.reduce(
       (total, a) => total + (a.pointsAchieved || 0),
       0
     );
-    session.totalScore =
-      (session.totalMultipleChoiceScore || 0) + (session.essayScore || 0);
+    const totalScore =
+      (session.totalMultipleChoiceScore || 0) + essayScore;
 
-    await this.examsessionRepo.save(session);
+    await this.examsessionRepo.update(session.id, {
+      essayScore,
+      totalScore,
+    });
 
     return {
       message: 'Cập nhật điểm thành công',
-      totalScore: session.totalScore,
-      essayScore: session.essayScore,
+      totalScore,
+      essayScore,
     };
   }
 

@@ -12,11 +12,12 @@ import { User } from 'src/users/entities/user.entity';
 export class ExamSessionController {
   constructor(private readonly examSessionService: ExamSessionService) { }
   @Get('detail/:id')
-  @Roles(Role.STUDENT && Role.TEACHER)
+  @Roles(Role.STUDENT, Role.TEACHER)
   async getExamSessionDetail(@Param('id', ParseIntPipe) sessionId: number, @Req() request: Request) {
     const user: User = request['user'] ?? null;
     return this.examSessionService.findOneExamSessionDetail(sessionId, user);
   }
+
   @Post()
   @Roles(Role.TEACHER)
   async findAllExamSessions(

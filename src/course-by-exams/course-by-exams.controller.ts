@@ -46,12 +46,13 @@ export class CourseByExamsController {
   }
 
   @Post('start/:id')
-  @Roles(Role.ADMIN, Role.TEACHER, Role.STUDENT)
+  @Roles( Role.TEACHER, Role.STUDENT)
   async getOrStartExamSession(
     @Param('id') id: number,
     @Body('password') password: string,
     @Req() request: Request) {
     const user: User = request['user'] ?? null;
+    // console.log(typeof(password))
     return await this.courseByExamsService.getOrStartExamSession(+id, user, password);
   }
 

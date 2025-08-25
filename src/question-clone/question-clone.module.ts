@@ -9,10 +9,11 @@ import { MultipeChoice } from 'src/multipe-choice/entities/multipe-choice.entity
 import { AnswerCloneModule } from 'src/answer-clone/answer-clone.module';
 import { Topic } from 'src/topics/entities/topic.entity';
 import { Level } from 'src/levels/entities/level.entity';
+import { Exam } from 'src/exams/entities/exam.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([QuestionClone, TypeQuestion, AnswerClone, MultipeChoice, Topic, Level]),
+    TypeOrmModule.forFeature([QuestionClone, TypeQuestion, AnswerClone, MultipeChoice, Topic, Level, Exam]),
     forwardRef(() => AnswerCloneModule),
   ],
   controllers: [QuestionCloneController],

@@ -40,8 +40,8 @@ export class QuestionCloneController {
     return this.questionCloneService.update(+id, updateQuestionCloneDto, user);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.questionCloneService.remove(+id);
-  }
+  // @Delete(':id')
+  // remove(@Param('id') id: string) {
+  //   return this.questionCloneService.remove(+id);
+  // }
 }

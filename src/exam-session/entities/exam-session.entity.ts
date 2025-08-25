@@ -38,6 +38,6 @@ export class ExamSession extends BaseWithCreatedBy {
 
   @Column({ type: 'float',default: 0 })
   totalMultipleChoiceScore: number;
-  @Column({ type: 'float', nullable: true, default: 0 })
+  @Column({ type: 'float', nullable: true})
   essayScore?: number;
 }

@@ -60,7 +60,7 @@ export class ExamsController {
   }
 
   @Patch(':id')
-  @Roles(Role.ADMIN && Role.TEACHER)
+  @Roles( Role.TEACHER)
   // @Public()
   update(
     @Param('id') id: string,

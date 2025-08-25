@@ -15,6 +15,7 @@ import { paginationKeyword } from 'src/utils/keywork-pagination';
 import { PageMetaDto } from 'src/common/paginations/dtos/page.metadata.dto';
 import { Topic } from 'src/topics/entities/topic.entity';
 import { Level } from 'src/levels/entities/level.entity';
+import { Exam } from 'src/exams/entities/exam.entity';
 
 @Injectable()
 export class QuestionCloneService {
@@ -23,6 +24,7 @@ export class QuestionCloneService {
     @InjectRepository(TypeQuestion) private typeQuestionRepo: Repository<TypeQuestion>,
     @InjectRepository(MultipeChoice) private multipeChoiceRepo: Repository<MultipeChoice>,
     @InjectRepository(AnswerClone) private answerCloneRepo: Repository<AnswerClone>,
+    @InjectRepository(Exam) private examRepo: Repository<Exam>,
     @InjectRepository(Topic) private topicRepo: Repository<Topic>,
     @InjectRepository(Level) private levelRepo: Repository<Level>,
     @Inject(forwardRef(() => AnswerCloneService))
@@ -181,10 +183,10 @@ export class QuestionCloneService {
   }
   async update(id: number, updateQuestionCloneDto: UpdateQuestionCloneDto, user: User) {
     // console.log('updated', updateQuestionCloneDto)
-    // console.log(updateQuestionCloneDto)
+    // console.log(id)
     const questionclone = await this.questionCloneRepo.findOne({
       where: { id },
-      relations: ['createdBy', 'answerclones'],
+      relations: ['createdBy', 'answerclones', 'typeQuestion', 'multipleChoice', 'topic', 'level'],
     });
 
     if (!questionclone) throw new NotFoundException(`Không tìm thấy questionclone với ID: ${id}`);
@@ -213,7 +215,9 @@ export class QuestionCloneService {
 
     if (topicId !== undefined) {
       const topic = await this.topicRepo.findOne({ where: { id: topicId } });
+      console.log(1)
       if (!topic) throw new NotFoundException('Topic không tồn tại');
+      console.log(2)
       questionclone.topic = topic;
     }
 
@@ -289,8 +293,10 @@ export class QuestionCloneService {
     const updated = await this.questionCloneRepo.save(questionclone);
     return new ItemDto(updated);
   }
-
-  remove(id: number) {
-    return `This action removes a #${id} questionClone`;
+  async remove(questionCloneId: number): Promise<void> {
+    
   }
+
+
+
 }
