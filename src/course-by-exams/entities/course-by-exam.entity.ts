@@ -54,4 +54,10 @@ export class CourseByExam extends BaseWithCreatedBy {
 
     @OneToMany(() => ExamSession, es => es.courseByExam)
     examSessions: ExamSession[];
+
+    @Column({default: 1}) 
+    examsCount: number
+
+    @Column({default: 'official'})
+    typeExam: string
 }
