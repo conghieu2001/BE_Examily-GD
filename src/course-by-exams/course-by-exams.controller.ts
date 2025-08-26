@@ -46,7 +46,7 @@ export class CourseByExamsController {
   }
 
   @Post('start/:id')
-  @Roles( Role.TEACHER, Role.STUDENT)
+  @Roles(Role.TEACHER, Role.STUDENT)
   async getOrStartExamSession(
     @Param('id') id: number,
     @Body('password') password: string,
@@ -71,6 +71,13 @@ export class CourseByExamsController {
   findOne(@Param('id') id: string, @Req() request: Request) {
     const user: User = request['user'] ?? null;
     return this.courseByExamsService.findOne(+id, user);
+  }
+
+  @Patch('examcount/:id')
+  @Roles(Role.ADMIN && Role.TEACHER)
+  updateExamCount(@Param('id') id: string, @Body() updateCourseByExamDto: UpdateCourseByExamDto, @Req() request: Request) {
+    const user: User = request['user'] ?? null;
+    return this.courseByExamsService.updateExamsCount(+id, updateCourseByExamDto, user);
   }
 
   @Patch(':id')

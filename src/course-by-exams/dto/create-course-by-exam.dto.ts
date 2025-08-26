@@ -43,4 +43,14 @@ export class CreateCourseByExamDto extends OmitType(BaseDto, [] as const) {
     @IsOptional()
     @IsEnum(statusExam)
     status?: statusExam;
+
+    @ApiProperty()
+    @IsOptional()
+    @IsInt()
+    examsCount: number;
+
+    @ApiProperty()
+    @IsOptional()
+    @IsString()
+    typeExam: string
 }

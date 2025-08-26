@@ -28,7 +28,7 @@ export class CourseByExamsService {
     private readonly examService: ExamsService,
   ) { }
   async create(createCourseByExamDto: CreateCourseByExamDto, user: User): Promise<CourseByExam> {
-    const { examId, courseId, password, availableFrom, availableTo, title, isPublic } = createCourseByExamDto
+    const { examId, courseId, password, availableFrom, availableTo, title, isPublic, examsCount, typeExam } = createCourseByExamDto
     const exam = await this.examRepo.findOne({ where: { id: examId } });
     if (!exam) {
       throw new NotFoundException(`Không tìm thấy đề thi gốc với ID: ${examId}`);
@@ -71,6 +71,8 @@ export class CourseByExamsService {
       status: computedStatus,
       availableFrom: from,
       availableTo: to,
+      examsCount: examsCount,
+      typeExam: typeExam,
       createdBy: user,
     }
     // console.log(data)
@@ -363,15 +365,73 @@ export class CourseByExamsService {
       await this.coursebyexamRepo.save(courseByExam);
     }
 
-    // Tìm hoặc tạo mới ExamSession
-    let examSession = await this.examSessionRepo.findOne({
-      where: {
-        createdBy: { id: user.id },
-        courseByExam: { id: courseByExam.id },
-      },
-      relations: []
-    });
-    if (!examSession) {
+    let examSession: ExamSession | null = null;
+    if (courseByExam.typeExam === 'official') {
+      // Tìm hoặc tạo mới ExamSession
+      examSession = await this.examSessionRepo.findOne({
+        where: {
+          createdBy: { id: user.id },
+          courseByExam: { id: courseByExam.id },
+        },
+        relations: []
+      });
+      if (!examSession) {
+        // Gom nhóm câu hỏi theo typeQuestion + multipleChoice
+        const grouped: Record<string, number[]> = {};
+        for (const q of courseByExam.exam.questionclones) {
+          const typeKey = q.typeQuestion?.name === 'multiple_choice' ? 'MC' : 'ESSAY';
+
+          const partKey = q.multipleChoice?.name || 'Khác';
+          const key = `${typeKey}_${partKey}`;
+
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(q.id);
+        }
+
+        // Thứ tự sắp xếp
+        const typeOrder = ['MC', 'ESSAY'];
+        const partOrder = ['Phần I', 'Phần II', 'Phần III', 'Khác'];
+
+        const shuffled: number[] = [];
+        for (const type of typeOrder) {
+          for (const part of partOrder) {
+            const key = `${type}_${part}`;
+            if (grouped[key]) {
+              // Random trong từng phần
+              const partShuffled = grouped[key].sort(() => Math.random() - 0.5);
+              shuffled.push(...partShuffled);
+            }
+          }
+        }
+
+        examSession = this.examSessionRepo.create({
+          courseByExam,
+          exam: courseByExam.exam,
+          startedAt: now,
+          isSubmitted: false,
+          questionOrder: shuffled,
+          examsessionOriginCount: courseByExam.examsCount,
+          createdBy: user,
+        });
+
+        await this.examSessionRepo.save(examSession);
+      } else {
+        if (examSession.examsessionCount === examSession.examsessionOriginCount) {
+          throw new BadRequestException('Đã vượt quá số lần tham gia!');
+        }
+        examSession.examsessionCount = examSession.examsessionCount + 1
+        await this.examSessionRepo.save(examSession)
+      }
+    } else {
+      const examSessions = await this.examSessionRepo.find({
+        where: {
+          createdBy: { id: user.id },
+          courseByExam: { id: courseByExam.id },
+        },
+      });
+      if (examSessions.length === courseByExam.examsCount) {
+        throw new BadRequestException('Đã vượt quá số lần tham gia!');
+      }
       // Gom nhóm câu hỏi theo typeQuestion + multipleChoice
       const grouped: Record<string, number[]> = {};
       for (const q of courseByExam.exam.questionclones) {
@@ -406,11 +466,13 @@ export class CourseByExamsService {
         startedAt: now,
         isSubmitted: false,
         questionOrder: shuffled,
+        examsessionOriginCount: courseByExam.examsCount,
         createdBy: user,
       });
 
       await this.examSessionRepo.save(examSession);
     }
+
 
 
     // if (!examSession) {
@@ -485,5 +547,38 @@ export class CourseByExamsService {
     await this.coursebyexamRepo.save(courseByExam);
     return { message: 'Đổi mật khẩu thành công' };
   }
+  async updateExamsCount(
+    id: number,
+    dto: UpdateCourseByExamDto,
+    user: User
+  ) {
+    const courseByExam = await this.coursebyexamRepo.findOne({
+      where: { id },
+      relations: ['examSessions', 'createdBy'],
+    });
+
+    if (!courseByExam) {
+      throw new NotFoundException(`Không tìm thấy CourseByExam với id: ${id}`);
+    }
+
+    if (dto.examsCount === undefined) {
+      throw new BadRequestException('examsCount is required');
+    }
+
+    courseByExam.examsCount = dto.examsCount;
+    await this.coursebyexamRepo.save(courseByExam);
+
+    if (courseByExam.examSessions?.length) {
+      for (const session of courseByExam.examSessions) {
+        session.examsessionOriginCount = dto.examsCount;
+      }
+      await this.examSessionRepo.save(courseByExam.examSessions);
+    }
+
+    return {
+      courseByExam
+    };
+  }
+
 
 }

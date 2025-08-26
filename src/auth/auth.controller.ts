@@ -28,9 +28,12 @@ export class AuthController {
     return user
   }
 
+  @Public()
   @Post('refresh-token')
   async refreshToken(@Body() body: { refreshToken: string }) {
     const { refreshToken } = body; // ✅ Lấy refreshToken từ body
+    console.log();
+    
     // console.log(refreshToken)
     if (!refreshToken) {
       throw new UnauthorizedException('Không có refresh token');
@@ -39,7 +42,7 @@ export class AuthController {
     try {
       // console.log('SECRET:', process.env.JWT_REFRESH_SECRET);
       const payload = this.jwtService.verify(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET,
+        secret: process.env.JWT_REFRESH_SECRET ,
       });
       const user = await this.repoUser.findOne({ // ✅ Truy cập trực tiếp repoUser
         where: { id: payload.id },
