@@ -564,7 +564,9 @@ export class CourseByExamsService {
     if (dto.examsCount === undefined) {
       throw new BadRequestException('examsCount is required');
     }
-
+    if(courseByExam.examsCount > dto.examsCount) {
+      throw new BadRequestException('Không thể cập nhật số lần tham gia nhỏ hơn số hiện tại!');
+    }
     courseByExam.examsCount = dto.examsCount;
     await this.coursebyexamRepo.save(courseByExam);
 
