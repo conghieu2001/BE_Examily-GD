@@ -28,9 +28,20 @@ import { QuestionScoreModule } from './question-score/question-score.module';
 import { SubmitAnswerModule } from './submit-answer/submit-answer.module';
 import { QuestionCloneModule } from './question-clone/question-clone.module';
 import { AnswerCloneModule } from './answer-clone/answer-clone.module';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
   imports: [
+    JwtModule.registerAsync({
+      imports: [ConfigModule], // Đảm bảo có access tới ConfigService
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: {
+          expiresIn: configService.get<string>('JWT_EXPIRES_IN') || '1h',
+        },
+      }),
+    }),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: process.env.NODE_ENV ? `.env.${process.env.NODE_ENV}` : '.env.development',

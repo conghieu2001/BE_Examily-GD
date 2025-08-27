@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { UpdateAuthDto } from './dto/update-auth.dto';
 import { LoginDto } from './dto/login-dto';
@@ -34,7 +34,7 @@ export class AuthService {
     const accessToken = this.jwtService.sign(payload);
     // Refresh token (thời gian dài hơn)
     const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: '7d',
+      expiresIn: process.env.JWT_EXPIRES_IN_REFRESH,
       secret: process.env.JWT_REFRESH_SECRET,
     });
     // Mã hóa và lưu refreshToken vào DB
@@ -47,4 +47,48 @@ export class AuthService {
        refreshToken,
     };
   }
+  async refreshToken(refreshToken: string, id:number) {
+    try {
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: process.env.JWT_REFRESH_SECRET,
+      });
+
+
+
+      const user = await this.repoUser.findOne({ where: { id: id } });
+      if (!user || !user.refreshToken) {
+        throw new UnauthorizedException('No refresh token found');
+      }
+
+      // so sánh token client gửi với token hash trong DB
+      const isMatch = await bcrypt.compare(refreshToken, user.refreshToken);
+      if (!isMatch) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+
+
+      if (!user) {
+        throw new Error('Refresh token không hợp lệ hoặc đã bị revoke');
+      }
+
+      const data = { ...user, password: undefined }
+      const newAccessToken = this.jwtService.sign(
+        data,
+        {
+          secret: process.env.JWT_SECRET,
+          expiresIn: process.env.JWT_EXPIRES_IN,
+        }
+      );
+
+      return {
+        ...data,
+        accessToken: newAccessToken,
+        refreshToken,
+      };
+    } catch (err) {
+      console.log(err);
+      throw new UnauthorizedException('Refresh token invalid or expired');
+    }
+  }
+
 }

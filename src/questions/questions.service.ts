@@ -239,14 +239,9 @@ export class QuestionsService {
 
     return new ItemDto(question);
   }
-<<<<<<< HEAD
-  async update(id: number, updateDto: UpdateQuestionDto) {
-    // console.log(id, 'efef')
-=======
   async update(id: number, updateDto: UpdateQuestionDto, user: User) {
     // console.log(id, user)
     // console.log(updateDto)
->>>>>>> ceecc7646631828138fae59819db8728056a7226
     const question = await this.questionRepo.findOne({
       where: { id },
       relations: ['createdBy', 'subject', 'topic', 'level', 'class', 'answers'],
@@ -306,21 +301,6 @@ export class QuestionsService {
       if (!classEntity) throw new NotFoundException('Class không tồn tại');
       question.class = classEntity;
     }
-<<<<<<< HEAD
-    // ✅ Cập nhật từng answer theo ID
-    if (answers && Array.isArray(answers)) {
-      // console.log(answers)
-      
-      for (let i=0; i<answers.length; i++) {
-        const a = answers[i] as any
-        const answer = question.answers[i]
-    
-        const updated = this.answerRepo.merge(answer, {
-          content: a.content,
-          isCorrect: a.isCorrect,
-        });
-        await this.answerRepo.update(answer.id, updated);
-=======
     // Cập nhật từng answer theo ID
     if (answers && Array.isArray(answers)) {
       const keepAnswerIds = answers
@@ -333,7 +313,6 @@ export class QuestionsService {
       if (toDeleteIds.length > 0) {
         await this.answerRepo.delete(toDeleteIds);
         question.answers = question.answers.filter(a => !toDeleteIds.includes(a.id));
->>>>>>> ceecc7646631828138fae59819db8728056a7226
       }
 
       const newAnswers: Answer[] = [];

@@ -7,13 +7,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
-    JwtModule.register({
-      global: true,
-      secret: 'thienthanh132',
-      signOptions: { expiresIn: '30s' },
-    }),
-    UsersModule,
-    ConfigModule.forRoot(), // Load biến môi trường từ .env
     JwtModule.registerAsync({
       imports: [ConfigModule], // Đảm bảo có access tới ConfigService
       inject: [ConfigService],
@@ -24,6 +17,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         },
       }),
     }),
+    UsersModule,
+    ConfigModule.forRoot(), // Load biến môi trường từ .env
+   
   ],
   controllers: [AuthController],
   providers: [AuthService],

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UnauthorizedException, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UnauthorizedException, UseGuards, Req, NotFoundException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { UpdateAuthDto } from './dto/update-auth.dto';
@@ -30,48 +30,14 @@ export class AuthController {
 
   @Public()
   @Post('refresh-token')
-  async refreshToken(@Body() body: { refreshToken: string }) {
-    const { refreshToken } = body; // ✅ Lấy refreshToken từ body
-    console.log();
+  async refreshToken(@Body() body: { refreshToken: string, id:number}) {
     
-    // console.log(refreshToken)
-    if (!refreshToken) {
-      throw new UnauthorizedException('Không có refresh token');
-    }
-
-    try {
-      // console.log('SECRET:', process.env.JWT_REFRESH_SECRET);
-      const payload = this.jwtService.verify(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET ,
-      });
-      const user = await this.repoUser.findOne({ // ✅ Truy cập trực tiếp repoUser
-        where: { id: payload.id },
-      });
-
-      if (!user || !user.refreshToken) {
-        throw new UnauthorizedException('Không tìm thấy người dùng hoặc refreshToken');
-      }
-
-      const bcrypt = await import('bcrypt'); // ✅ Import động nếu cần
-      const isMatch = await bcrypt.compare(refreshToken, user.refreshToken);
-
-      if (!isMatch) {
-        throw new UnauthorizedException('Refresh token không hợp lệ');
-      }
-
-      const newAccessToken = this.jwtService.sign(
-        { id: user.id,username: user.username, role: user.role },
-        {
-          secret: process.env.JWT_SECRET,
-          expiresIn: process.env.JWT_EXPIRES_IN || '1h',
-        }
-      );
-
-      return { accessToken: newAccessToken };
+    return this.authService.refreshToken(body.refreshToken, body['id']);
     } catch (error) {
-      throw new UnauthorizedException('Refresh token không hợp lệ hoặc hết hạn');
+      console.log(error);
+      throw new NotFoundException('Refresh token không hợp lệ hoặc hết hạn');
     }
-  }
+  
 
   @Post('logout')
   async logout(@Req() request: Request) {
